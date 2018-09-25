@@ -9,6 +9,7 @@
 #define _NETBSD_SOURCE	1	/* tell headers to include MINIX stuff */
 #define _SYSTEM		1	/* get negative error number in <errno.h> */
 
+#include <limits.h>
 /* The following are so basic, all the *.c files get them automatically. */
 #include <minix/config.h>	/* MUST be first */
 #include <minix/bitmap.h>
@@ -34,7 +35,6 @@
 
 #include <errno.h>
 #include <lib.h>
-#include <limits.h>
 #include <signal.h>
 #include <stddef.h>
 #include <stdlib.h>

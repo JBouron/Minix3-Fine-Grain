@@ -7,7 +7,7 @@ set -e
 #
 
 : ${ARCH=i386}
-: ${OBJ=../obj.${ARCH}}
+: ${OBJ=obj.${ARCH}}
 : ${TOOLCHAIN_TRIPLET=i586-elf32-minix-}
 : ${BUILDSH=build.sh}
 

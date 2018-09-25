@@ -1,0 +1,1 @@
+Add the following to the boot params : acpi=yes no_apic=0

@@ -1,0 +1,16 @@
+Stacktrace :
+0 0xf0437d5b : __udivmoddi4
+1 0xf0437c0f : __udivdi3
+2 0xf041aa7d : get_cpu_ticks 
+3 0xf0433695 : do_getinfo
+4 0xf042d104 : kernel_call_dispatch
+5 0xf042d0a5 : kernel_call
+6 0xf0419d85 : kernel_call_entry_common
+
+Notes:
+* get_cpu_ticks performs `ticks[i] = tsc_per_state[cpu][i] / tsc_per_tick[cpu];`
+* tsc_per_tick is a global array in arch_clock.c
+* tsc_per_tick is only written in init_local_timer (arch_clock.c).
+* get_cpu_ticks only called by do_getinfo
+* do_getinfo does not check if cpu <= cpu alive
+* call get_cpu_ticks with cpu > cpu alives

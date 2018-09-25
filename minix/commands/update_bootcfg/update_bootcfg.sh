@@ -97,7 +97,7 @@ rootdevname=`echo $ROOT | sed 's/\/dev\///'`
 
 # Construct a list of inherited arguments for boot options to use. Note that
 # rootdevname must not be passed on this way, as it is changed during setup.
-args=""
+args="acpi=yes no_apic=0"
 for k in $INHERIT; do
 	if sysenv | grep -sq "^$k="; then
 		kv=$(sysenv | grep "^$k=")

@@ -120,6 +120,12 @@ void kmain(kinfo_t *local_cbi)
   register int i, j;
   static int bss_test;
 
+  /* Use this to hang at boot and have a change to debug the early boot
+   * procedure.
+   */
+  int volatile __barrier = 0;
+  while (__barrier);
+
   /* bss sanity check */
   assert(bss_test == 0);
   bss_test = 1;
