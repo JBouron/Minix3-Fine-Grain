@@ -152,7 +152,10 @@ void kmain(kinfo_t *local_cbi)
 
   cstart();
 
+#ifdef CONFIG_SMP
+  spinlock_init(&big_kernel_lock);
   BKL_LOCK();
+#endif
  
    DEBUGEXTRA(("main()\n"));
 
