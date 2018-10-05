@@ -207,7 +207,9 @@ static void idle(void)
 	/* start accounting for the idle time */
 	context_stop(proc_addr(KERNEL));
 #if !SPROFILE
-	halt_cpu();
+	//KTZ: for now don't halt, only pause.
+	//halt_cpu();
+	arch_pause();
 #else
 	if (!sprofiling)
 		halt_cpu();

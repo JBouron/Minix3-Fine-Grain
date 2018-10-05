@@ -23,6 +23,19 @@
 
 void trampoline(void);
 
+void __gdb_bkl_lock(int id) {
+	__gdb_lock_owner = id;
+}
+
+void __gdb_bkl_unlock(int id) {
+	if (__gdb_lock_owner != id && __gdb_lock_owner >= 0) {
+		panic("Lock owned by %d but unlocked by %d\n", __gdb_lock_owner, id);
+	} /*else if (__gdb_lock_owner == -1) {
+		panic("Unlocking non-acquired lock\n");
+	} */
+	__gdb_lock_owner = -1;
+}
+
 /*
  * arguments for trampoline. We need to pass the logical cpu id, gdt and idt.
  * They have to be in location which is reachable using absolute addressing in

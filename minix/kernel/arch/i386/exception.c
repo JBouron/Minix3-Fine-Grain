@@ -5,6 +5,7 @@
 
 #include "kernel/kernel.h"
 #include "arch_proto.h"
+#include "apic.h"
 #include <signal.h>
 #include <string.h>
 #include <assert.h>

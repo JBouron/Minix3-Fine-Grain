@@ -38,7 +38,23 @@ void arch_spinlock_unlock(atomic_t * sl);
 
 #endif /* CONFIG_SMP */
 
-#define BKL_LOCK()	spinlock_lock(&big_kernel_lock)
-#define BKL_UNLOCK()	spinlock_unlock(&big_kernel_lock)
+/*#define BKL_LOCK()	spinlock_lock(&big_kernel_lock)
+#define BKL_UNLOCK()	spinlock_unlock(&big_kernel_lock)*/
+
+volatile int __gdb_lock_owner;
+void __gdb_bkl_lock(int id);
+void __gdb_bkl_unlock(int id);
+
+#define BKL_LOCK() \
+	do { \
+		spinlock_lock(&big_kernel_lock); \
+		__gdb_bkl_lock(cpuid); \
+	} while (0)
+
+#define BKL_UNLOCK() \
+	do { \
+		__gdb_bkl_unlock(cpuid); \
+		spinlock_unlock(&big_kernel_lock); \
+	} while (0)
 
 #endif /* __SPINLOCK_H__ */
