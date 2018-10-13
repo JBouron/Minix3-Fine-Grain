@@ -147,6 +147,7 @@ void copy_trampoline(void)
 
 extern int booting_cpu;	/* tell protect.c what to do */
 
+static int __gdb_delay_smp_start = 0;
 static void smp_start_aps(void)
 {
 	unsigned cpu;
@@ -180,6 +181,11 @@ static void smp_start_aps(void)
 	 * using the processor's apic id values.
 	 */
 	for (cpu = 0; cpu < ncpus; cpu++) {
+		if(__gdb_delay_smp_start) {
+			int __gdb_dummy = 1;
+			while(__gdb_dummy);
+		}
+
 		ap_cpu_ready = -1;
 		/* Don't send INIT/SIPI to boot cpu.  */
 		if((apicid() == cpuid2apicid[cpu]) && 

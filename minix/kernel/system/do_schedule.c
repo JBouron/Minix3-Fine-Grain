@@ -31,5 +31,10 @@ int do_schedule(struct proc * caller, message * m_ptr)
 	cpu = (__gdb_do_schedule_cpu_override >= 0) ?
 			__gdb_do_schedule_cpu_override
 			: cpu;
-	return sched_proc(p, priority, quantum, cpu, niced);
+	int val;
+	val = sched_proc(p, priority, quantum, cpu, niced);
+	if(val) {
+		printf("Error sched %s on %d\n", p->p_name, cpu);
+	}
+	return val;
 }

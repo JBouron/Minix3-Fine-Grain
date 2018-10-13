@@ -104,6 +104,7 @@ void bsp_finish_booting(void)
   /* Kernel may no longer use bits of memory as VM will be running soon */
   kernel_may_alloc = 0;
 
+  wait_for_APs_to_finish_booting();
   switch_to_user();
   NOT_REACHABLE;
 }
@@ -123,7 +124,7 @@ void kmain(kinfo_t *local_cbi)
   /* Use this to hang at boot and have a change to debug the early boot
    * procedure.
    */
-  int volatile __barrier = 1;
+  int volatile __barrier = 0;
   while (__barrier);
 
   /* bss sanity check */
