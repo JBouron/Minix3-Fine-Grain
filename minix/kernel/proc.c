@@ -208,7 +208,7 @@ static void idle(void)
 	context_stop(proc_addr(KERNEL));
 #if !SPROFILE
 	halt_cpu();
-	BKL_LOCK();
+	//BKL_LOCK();
 #else
 	if (!sprofiling)
 		halt_cpu();
@@ -1145,7 +1145,7 @@ int mini_notify(
       /* Destination is indeed waiting for a message. Assemble a notification 
        * message and deliver it. Copy from pseudo-source HARDWARE, since the
        * message is in the kernel's address space.
-       */ 
+       */
       assert(!(dst_ptr->p_misc_flags & MF_DELIVERMSG));
 
       BuildNotifyMessage(&dst_ptr->p_delivermsg, proc_nr(caller_ptr), dst_ptr);

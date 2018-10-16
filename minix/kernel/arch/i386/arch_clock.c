@@ -366,7 +366,7 @@ void context_stop_idle(void)
 	if (sprofiling)
 		get_cpulocal_var(idle_interrupted) = 1;
 #endif
-	BKL_UNLOCK();
+	//BKL_UNLOCK();
 }
 
 u64_t ms_2_cpu_time(unsigned ms)
