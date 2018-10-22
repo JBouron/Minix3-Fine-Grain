@@ -92,7 +92,7 @@
 #define FASTLOAD _FASTLOAD
 
 /* Enable or disable system profiling. */
-#define SPROFILE          0    /* statistical profiling */
+#define SPROFILE          1    /* statistical profiling */
 
 /* PCI configuration parameters */
 #define NR_PCIBUS 40
