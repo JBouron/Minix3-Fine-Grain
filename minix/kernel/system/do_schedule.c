@@ -5,8 +5,6 @@
 /*===========================================================================*
  *				do_schedule				     *
  *===========================================================================*/
-static int __gdb_do_schedule_cpu_override = -1;
-
 int do_schedule(struct proc * caller, message * m_ptr)
 {
 	struct proc *p;
@@ -28,9 +26,6 @@ int do_schedule(struct proc * caller, message * m_ptr)
 	cpu = m_ptr->m_lsys_krn_schedule.cpu;
 	niced = !!(m_ptr->m_lsys_krn_schedule.niced);
 
-	cpu = (__gdb_do_schedule_cpu_override >= 0) ?
-			__gdb_do_schedule_cpu_override
-			: cpu;
 	int val;
 	val = sched_proc(p, priority, quantum, cpu, niced);
 	if(val) {
