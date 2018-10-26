@@ -12,6 +12,7 @@
 #include <assert.h>
 #include <minix/com.h>
 #include <machine/archtypes.h>
+#include <stdio.h>
 
 static unsigned balance_timeout;
 
@@ -44,9 +45,21 @@ static int schedule_process(struct schedproc * rmp, unsigned flags);
 #define is_system_proc(p)	((p)->parent == RS_PROC_NR)
 
 static unsigned cpu_proc[CONFIG_MAX_CPUS];
+static void print_loads_summary(void)
+{
+	printf("Cpu loads: ");
+	for(int i=0;i<CONFIG_MAX_CPUS;++i) {
+		printf("%d:%d ",i,cpu_proc[i]);
+	}
+	printf("\n");
+}
 
+static int next_cpu = 0;
 static void pick_cpu(struct schedproc * proc)
 {
+	int __gdb_cpu = (next_cpu++)%machine.processors_count;
+	proc->cpu = __gdb_cpu;
+	return;
 #ifdef CONFIG_SMP
 	unsigned cpu, c;
 	unsigned cpu_load = (unsigned) -1;
@@ -75,6 +88,7 @@ static void pick_cpu(struct schedproc * proc)
 	}
 	proc->cpu = cpu;
 	cpu_proc[cpu]++;
+	print_loads_summary();
 #else
 	proc->cpu = 0;
 #endif
