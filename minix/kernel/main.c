@@ -124,7 +124,7 @@ void kmain(kinfo_t *local_cbi)
   /* Use this to hang at boot and have a change to debug the early boot
    * procedure.
    */
-  int volatile __barrier = 1;
+  int volatile __barrier = 0;
   while (__barrier);
 
   /* bss sanity check */

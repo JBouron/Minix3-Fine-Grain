@@ -368,7 +368,6 @@ void balance_queues(void)
 	struct schedproc *rmp;
 	int r, proc_nr;
 
-	printf("Balance queues. Sys_hz = %d\n",sys_hz());
 	for (proc_nr=0, rmp=schedproc; proc_nr < NR_PROCS; proc_nr++, rmp++) {
 		if (rmp->flags & IN_USE) {
 			if (rmp->priority > rmp->max_priority) {
