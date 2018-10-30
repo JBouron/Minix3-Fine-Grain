@@ -59,12 +59,9 @@ static int pick_cpu(struct schedproc * proc)
 	if (machine.processors_count == 1)
 		return machine.bsp_id;
 
-	/* schedule sysytem processes only on the boot cpu */
-	if (is_system_proc(proc))
-		return machine.bsp_id;
-
 	/* if no other cpu available, try BSP */
 	cpu = machine.bsp_id;
+	cpu_load = cpu_proc[machine.bsp_id];
 	for (c = 0; c < machine.processors_count; c++) {
 		/* skip dead cpus */
 		if (!cpu_is_available(c))
@@ -74,6 +71,7 @@ static int pick_cpu(struct schedproc * proc)
 			cpu = c;
 		}
 	}
+	print_loads_summary();
 	return cpu;
 #else
 	return 0;
@@ -352,7 +350,6 @@ void init_scheduling(void)
  */
 void balance_queues(void)
 {
-	return;
 	struct schedproc *rmp;
 	int r, proc_nr;
 
