@@ -1626,27 +1626,29 @@ void enqueue(
       rp->p_nextready = NULL;		/* mark new end */
   }
 
-  if (cpuid == rp->p_cpu) {
-	  /*
-	   * enqueueing a process with a higher priority than the current one,
-	   * it gets preempted. The current process must be preemptible. Testing
-	   * the priority also makes sure that a process does not preempt itself
-	   */
-	  struct proc * p;
-	  p = get_cpulocal_var(proc_ptr);
-	  assert(p);
-	  if((p->p_priority > rp->p_priority) &&
-			  (priv(p)->s_flags & PREEMPTIBLE))
-		  RTS_SET(p, RTS_PREEMPTED); /* calls dequeue() */
-  }
 #ifdef CONFIG_SMP
   /*
    * if the process was enqueued on a different cpu and the cpu is idle, i.e.
    * the time is off, we need to wake up that cpu and let it schedule this new
    * process
    */
-  else if (get_cpu_var(rp->p_cpu, cpu_is_idle)) {
+  if (cpuid!=rp->p_cpu&&get_cpu_var(rp->p_cpu, cpu_is_idle)) {
+	  /* Wake up remote cpu. */
 	  smp_schedule(rp->p_cpu);
+  }
+
+  if (!get_cpu_var(rp->p_cpu, cpu_is_idle)) {
+	  /* The dest cpu is not idle, we may need to preempt its current task. */
+	  /*
+	   * enqueueing a process with a higher priority than the current one,
+	   * it gets preempted. The current process must be preemptible. Testing
+	   * the priority also makes sure that a process does not preempt itself
+	   */
+	  struct proc * p;
+	  p = get_cpu_var(rp->p_cpu,proc_ptr);
+	  assert(p);
+	  if((p->p_priority > rp->p_priority) && (priv(p)->s_flags & PREEMPTIBLE))
+		  RTS_SET(p, RTS_PREEMPTED); /* calls dequeue() */
   }
 #endif
 
