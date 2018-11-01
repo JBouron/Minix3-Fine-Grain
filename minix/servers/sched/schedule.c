@@ -356,7 +356,11 @@ void balance_queues(void)
 		if (rmp->flags & IN_USE) {
 			if (rmp->priority > rmp->max_priority) {
 				rmp->priority -= 1; /* increase priority */
-				schedule_process(rmp,SCHEDULE_CHANGE_PRIO|SCHEDULE_CHANGE_QUANTUM);
+				/* Select new cpu. */
+				cpu_proc[rmp->cpu]--;
+				rmp->cpu = pick_cpu(rmp);
+				cpu_proc[rmp->cpu]++;
+				schedule_process(rmp,SCHEDULE_CHANGE_ALL);
 			}
 		}
 	}
