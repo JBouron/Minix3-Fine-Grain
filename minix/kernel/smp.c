@@ -197,9 +197,17 @@ void smp_ipi_sched_handler(void)
 
 	ipi_ack();
 
+	/* We used to preempt the curr here, no matter what. However a race
+	 * condition can (and will arise) if the remote core is picking the
+	 * next task to run at the same time. In this case the IPI will mark
+	 * this task as RTS_PREEMPTED and the assert(proc_is_runnable(p)) in
+	 * switch_to_user will fail.
+	 */
+#if 0
 	curr = get_cpulocal_var(proc_ptr);
 	if (curr->p_endpoint != IDLE) {
 		RTS_SET(curr, RTS_PREEMPTED);
 	}
+#endif
 }
 
