@@ -71,7 +71,6 @@ static int pick_cpu(struct schedproc * proc)
 			cpu = c;
 		}
 	}
-	print_loads_summary();
 	return cpu;
 #else
 	return 0;
