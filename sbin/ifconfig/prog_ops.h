@@ -30,6 +30,7 @@
 #define _PROG_OPS_H_
 
 #include <sys/types.h>
+#include <minix/syslib.h>
 
 /* ifconfig is compiled outside of src/sbin/ifconfig too */
 #ifndef CRUNCHOPS
@@ -49,7 +50,7 @@ extern const struct prog_ops prog_ops;
 #define prog_socket prog_ops.op_socket
 #define prog_ioctl prog_ops.op_ioctl
 #define prog_read prog_ops.op_read
-#define prog_close prog_ops.op_close
+#define prog_close __gdb_closenb
 #else
 #define prog_init ((int (*)(void))NULL)
 #define prog_socket socket
