@@ -94,7 +94,6 @@ int	chown(const char *, uid_t, gid_t) __RENAME(__posix_chown);
 int	chown(const char *, uid_t, gid_t);
 #endif /* defined(_POSIX_C_SOURCE) || defined(_XOPEN_SOURCE) */
 int	 close(int);
-int	 __gdb_closenb(int);
 size_t	 confstr(int, char *, size_t);
 #ifndef __CUSERID_DECLARED
 #define __CUSERID_DECLARED
