@@ -15,6 +15,7 @@
 #include <stdio.h>
 
 static unsigned balance_timeout;
+static unsigned nb_balance = 0;
 
 #define BALANCE_TIMEOUT	5 /* how often to balance queues in seconds */
 
@@ -49,6 +50,25 @@ static void print_loads_summary(void)
 	printf("\n");
 }
 
+static void restrict_to_bsp(struct schedproc *proc)
+{
+	/* Clear the bitmask first. */
+	int i;
+	for(i=0;i<BITMAP_CHUNKS(CONFIG_MAX_CPUS);++i) {
+		bit_empty(proc->cpu_mask[i]);
+	}
+	/* Set the BSP. */
+	SET_BIT(proc->cpu_mask,machine.bsp_id);
+}
+
+static void allow_all_cpus(struct schedproc *proc)
+{
+	int i;
+	for(i=0;i<BITMAP_CHUNKS(CONFIG_MAX_CPUS);++i) {
+		bit_fill(proc->cpu_mask[i]);
+	}
+}
+
 static int next_cpu = 0;
 static int pick_cpu(struct schedproc * proc)
 {
@@ -65,6 +85,8 @@ static int pick_cpu(struct schedproc * proc)
 	for (c = 0; c < machine.processors_count; c++) {
 		/* skip dead cpus */
 		if (!cpu_is_available(c))
+			continue;
+		if(!GET_BIT(proc->cpu_mask,c))
 			continue;
 		if (c != machine.bsp_id && cpu_load > cpu_proc[c]) {
 			cpu_load = cpu_proc[c];
@@ -160,6 +182,13 @@ int do_start_scheduling(message *m_ptr)
 	rmp->max_priority = m_ptr->m_lsys_sched_scheduling_start.maxprio;
 	if (rmp->max_priority >= NR_SCHED_QUEUES) {
 		return EINVAL;
+	}
+
+	/* The system processes will run on the BSP cpu only during boot. */
+	if(is_system_proc(rmp)) {
+		restrict_to_bsp(rmp);
+	} else {
+		allow_all_cpus(rmp);
 	}
 
 	cpu_chosen = 0;
@@ -338,6 +367,11 @@ void init_scheduling(void)
 		panic("sys_setalarm failed: %d", r);
 }
 
+static int is_restricted_to_bsp(struct schedproc *proc)
+{
+	return !GET_BIT(proc->cpu_mask,(machine.bsp_id+1)%CONFIG_MAX_CPUS);
+}
+
 /*===========================================================================*
  *				balance_queues				     *
  *===========================================================================*/
@@ -351,9 +385,20 @@ void balance_queues(void)
 {
 	struct schedproc *rmp;
 	int r, proc_nr;
+	nb_balance ++;
 
 	for (proc_nr=0, rmp=schedproc; proc_nr < NR_PROCS; proc_nr++, rmp++) {
 		if (rmp->flags & IN_USE) {
+			if(is_system_proc(rmp)&&
+			   is_restricted_to_bsp(rmp)&&
+			   nb_balance>10) {
+				/* Allow the system processes on all cpus after
+				 * a while. This is dirty as fuck. But for now
+				 * it's better than changing this goddamn
+				 * broken kernel and all its shit assumptions.
+				 */
+				allow_all_cpus(rmp);
+			}
 			if (rmp->priority > rmp->max_priority) {
 				rmp->priority -= 1; /* increase priority */
 				/* Select new cpu. */
