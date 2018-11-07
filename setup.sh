@@ -18,5 +18,7 @@ echo "y" | pkgin in $PKGS
 # Finishing up, start services
 # Start ssh server
 /usr/pkg/etc/rc.d/sshd onestart
+# Enable sshd at boot
+sed -i 's|sshd=NO|sshd=YES|' /etc/defaults/rc.conf
 
 echo "[+] Setup done. Goodbye !"

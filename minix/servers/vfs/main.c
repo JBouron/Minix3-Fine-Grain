@@ -63,7 +63,7 @@ int main(void)
   /* SEF local startup. */
   sef_local_startup();
 
-  printf("Started VFS: %d worker thread(s)\n", NR_WTHREADS);
+  printf("Started retry VFS: %d worker thread(s)\n", NR_WTHREADS);
 
   /* This is the main loop that gets work, processes it, and sends replies. */
   while (TRUE) {
@@ -641,12 +641,18 @@ void reply(message *m_out, endpoint_t whom, int result)
   int r;
 
   m_out->m_type = result;
+retry:
   r = ipc_sendnb(whom, m_out);
   if (r != OK) {
 	printf("VFS: %d couldn't send reply %d to %d: %d\n", mthread_self(),
 		result, whom, r);
 	util_stacktrace();
   }
+  /* The dest endpoint was simply not ready for this message. Do not give up !
+   * as it might wait forever !!!
+   */
+  if(r==ENOTREADY)
+	  goto retry;
 }
 
 /*===========================================================================*
