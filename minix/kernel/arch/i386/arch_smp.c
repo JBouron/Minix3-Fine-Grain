@@ -44,10 +44,6 @@ void __gdb_bkl_lock(spinlock_t *lock, int cpu) {
 	/* Set the lock owner and the stack trace leading to this lock event */
 	/* WARNING: This function should be called while the lock is held. */
 	u32_t ebp;
-	if (lock->owner != -1) {
-		/* This should never happen right ? */
-		panic("Locking twice !!!");
-	}
 	lock->owner = cpu;
 	lock->acquired_count ++;
 	reset_stack_trace(lock->unlock_stack_trace, SPINLOCK_MAX_STACK_DEPTH);
