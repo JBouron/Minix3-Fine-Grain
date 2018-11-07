@@ -354,6 +354,7 @@ static void announce(void)
       OS_RELEASE);
   printf("MINIX is open source software, see http://www.minix3.org\n");
   printf("This version supports SMP!\n");
+#include "bootmsg.c"
 }
 
 /*===========================================================================*

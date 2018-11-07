@@ -52,3 +52,6 @@ lib/libc/compat__*
 minix_x86.img
 build.log
 obj.i386/
+minix/kernel/bootmsg.c
+*.img
+*.img.bak
