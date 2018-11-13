@@ -55,3 +55,4 @@ obj.i386/
 minix/kernel/bootmsg.c
 *.img
 *.img.bak
+gdb.txt

@@ -38,6 +38,7 @@
 #include "clock.h"
 #include "spinlock.h"
 #include "arch_proto.h"
+#include "glo.h"
 
 #include <minix/syslib.h>
 
@@ -652,6 +653,7 @@ int do_ipc(reg_t r1, reg_t r2, reg_t r3)
    *   - NOTIFY:  asynchronous call; deliver notification or mark pending
    *   - SENDA:   list of asynchronous send requests
    */
+  reg_ipc_call(call_nr);
   switch(call_nr) {
   	case SENDREC:
   	case SEND:			

@@ -29,6 +29,14 @@
 #endif
 #include "spinlock.h"
 
+/* Declare vars for kernel entry stats. */
+struct kernel_entry_stats kernel_entries_stats;
+int kernel_entries_reg_enable = 0;
+
+SPINLOCK_DEFINE(ktrace_lock);
+struct kernel_trace_entry ktrace[KTRACE_SIZE];
+unsigned ktrace_idx = 0;
+
 /* dummy for linking */
 char *** _penviron;
 

@@ -59,13 +59,16 @@ void __gdb_bkl_unlock(spinlock_t *lock, int cpu);
 
 #define BKL_LOCK() \
 	do { \
+		add_ktrace(KTRACE_BKL_TRY); \
 		spinlock_lock(&big_kernel_lock); \
+		add_ktrace(KTRACE_BKL_ACQUIRE); \
 		__gdb_bkl_lock(&big_kernel_lock, cpuid); \
 	} while (0)
 
 #define BKL_UNLOCK() \
 	do { \
 		__gdb_bkl_unlock(&big_kernel_lock, cpuid); \
+		add_ktrace(KTRACE_BKL_RELEASE); \
 		spinlock_unlock(&big_kernel_lock); \
 	} while (0)
 
