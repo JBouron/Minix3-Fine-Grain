@@ -3,6 +3,7 @@
 
 //#include "kernel/kernel.h"
 #include <machine/archtypes.h>
+#include "ktzprofile.h"
 
 #define SPINLOCK_MAX_STACK_DEPTH 16
 typedef struct spinlock {
@@ -60,8 +61,10 @@ void __gdb_bkl_unlock(spinlock_t *lock, int cpu);
 #define BKL_LOCK() \
 	do { \
 		add_ktrace(KTRACE_BKL_TRY); \
+		ktzprofile_try_bkl(); \
 		spinlock_lock(&big_kernel_lock); \
 		add_ktrace(KTRACE_BKL_ACQUIRE); \
+		ktzprofile_acquire_bkl(); \
 		__gdb_bkl_lock(&big_kernel_lock, cpuid); \
 	} while (0)
 
@@ -69,6 +72,7 @@ void __gdb_bkl_unlock(spinlock_t *lock, int cpu);
 	do { \
 		__gdb_bkl_unlock(&big_kernel_lock, cpuid); \
 		add_ktrace(KTRACE_BKL_RELEASE); \
+		ktzprofile_release_bkl(); \
 		spinlock_unlock(&big_kernel_lock); \
 	} while (0)
 
