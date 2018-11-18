@@ -1,4 +1,7 @@
 #include "ktzprofile.h"
+#include "include/minix/ipcconst.h" /* For IPC codes. */
+#include "include/minix/sysutil.h" /* For panic(). */
+#include "include/minix/com.h" /* For kernel call codes. */
 
 /* Per-cpu profiling. */
 struct ktzprofile_data ktzprofile_per_cpu_data[CONFIG_MAX_CPUS];
@@ -10,81 +13,171 @@ extern void read_tsc_64(u64_t*);
 extern u64_t cpu_hz[CONFIG_MAX_CPUS]; 
 
 #define KTZPROFILE_CHECK_ENABLED() do{if(!ktzprofile_enabled)return;}while(0)
+#define min(a,b) ((a)>(b)?(b):(a))
+#define max(a,b) ((a)>(b)?(a):(b))
 
 static u64_t make64(unsigned long lo, unsigned long hi)
 {
 	return ((u64_t)hi << 32) | (u64_t)lo;
 }
 
-void ktzprofile_try_bkl(void)
+static inline u64_t cycles_to_usec(u64_t cycles)
 {
-	KTZPROFILE_CHECK_ENABLED();
-	/* Simply remember when we started trying. */
-	read_tsc_64(&(ktzprofile_per_cpu_data[__gdb_cpuid()].last_bkl_try_tsc));
+	u64_t usec;
+	usec = make64(1000000,0);
+	return (usec*cycles)/cpu_hz[__gdb_cpuid()];
 }
 
-void ktzprofile_acquire_bkl(void)
+static void init_stat(struct ktzprofile_stat *stat,int event_a,int event_b)
 {
-	/* Compute the time we waited for the lock and update the field in the
-	 * cpu local data. */
-	u64_t now,delta;
+	stat->event_a = event_a;
+	stat->event_b = event_b;
+	stat->last_event_a_tsc = 0;
+	stat->delta_sum = 0;
+	stat->samples = 0;
+
+	stat->delta_avg_usec = 0;
+	stat->tot_time_usec = 0;
+	stat->min_delta_usec = make64(0xffffffff,0xffffffff);
+	stat->max_delta_usec = 0;
+}
+
+void ktzprofile_init(void)
+{
+	int cpu,i,event;
 	struct ktzprofile_data *data;
+	struct ktzprofile_stat *stat;
+
+	for(cpu=0;cpu<CONFIG_MAX_CPUS;++cpu) {
+		data = &ktzprofile_per_cpu_data[cpu];
+		
+		data->first_sample_tsc = 0;
+		data->last_sample_tsc = 0;
+		/* Init BKL and Critical section stats manually. */
+		init_stat(&(data->bkl_stats),KTRACE_BKL_TRY,KTRACE_BKL_ACQUIRE);
+		init_stat(&(data->critical_section_stats),
+			  KTRACE_BKL_ACQUIRE,
+			  KTRACE_BKL_RELEASE);
+		init_stat(&(data->idle_time_stats),
+			  KTRACE_IDLE_START,
+			  KTRACE_IDLE_STOP);
+		init_stat(&(data->userspace_time_stats),
+			  KTRACE_USER_START,
+			  KTRACE_USER_STOP);
+
+		for(i=0;i<KTRACE_NUM_KERNEL_CALLS;++i) {
+			event=KTRACE_SYS_FORK;
+			for(;event<=KTRACE_SYS_PADCONF;++event) {
+				stat = &(data->kernel_call_stats[event]);
+				init_stat(stat,event,KTRACE_BKL_RELEASE);
+			}
+		}
+
+		for(i=0;i<KTRACE_NUM_IPCS;++i) {
+			event=KTRACE_SEND;
+			for(;event<=KTRACE_SENDA;++event) {
+				int e = event-KTRACE_SEND;
+				stat = &(data->ipc_stats[e]);
+				init_stat(stat,event,KTRACE_BKL_RELEASE);
+			}
+		}
+	}
+}
+
+static void update_stat(struct ktzprofile_stat *stat,u64_t now,int ktrace_event)
+{
+	u64_t delta,delta_usec;
+	if(ktrace_event==stat->event_a) {
+		/* Register the start time. */
+		stat->last_event_a_tsc = now;
+	} else if(ktrace_event==stat->event_b) {
+		/* If we started the profiling in a middle of [A,B] then
+		 * ignore this sample. */
+		if(!stat->last_event_a_tsc)
+			return;
+
+		/* Compute the delta cycles between the last event a. And
+		 * update the running sum and the number of samples. */
+		delta = now-stat->last_event_a_tsc;
+		stat->delta_sum += delta;
+		stat->samples ++;
+
+		/* Update the last avg and total spent time between A and B. */
+		stat->delta_avg_usec = cycles_to_usec(stat->delta_sum/stat->samples);
+		stat->tot_time_usec = cycles_to_usec(stat->delta_sum);
+
+		/* Update min and max. */
+		delta_usec = cycles_to_usec(delta);
+		stat->min_delta_usec = min(stat->min_delta_usec,delta_usec);
+		stat->max_delta_usec = max(stat->max_delta_usec,delta_usec);
+
+		stat->last_event_a_tsc = 0;
+	} else {
+		/* This stat does not concern this event, simply ignore it. */
+	}
+}
+
+void ktzprofile_event(int ktrace_event)
+{
+	int i;
+	struct ktzprofile_data *data;
+	u64_t now;
 
 	KTZPROFILE_CHECK_ENABLED();
-
 	data = &ktzprofile_per_cpu_data[__gdb_cpuid()];
 	read_tsc_64(&now);
 
-	/* It might happen that we start the profiling between the TRY and
-	 * ACQUIRE. In this case the last_bkl_try_tsc will not be set (eg.
-	 * default value of 0). If it happens simply ignore this sample. */
-	if(!data->last_bkl_try_tsc)
-		return;
+	if(!data->first_sample_tsc)
+		data->first_sample_tsc = now;
+	data->last_sample_tsc = now;
 
-	/* Compute the delta cycles between the last try. */
-	delta = now-data->last_bkl_try_tsc;
-	data->bkl_wait_tsc_delta_sum += delta;
-	data->bkl_wait_samples ++;
+	update_stat(&(data->bkl_stats),now,ktrace_event);
+	update_stat(&(data->critical_section_stats),now,ktrace_event);
+	update_stat(&(data->idle_time_stats),now,ktrace_event);
+	update_stat(&(data->userspace_time_stats),now,ktrace_event);
 
-	/* Update the tsc at which we got the BKL. */
-	data->last_bkl_acquire_tsc = now;
-	data->last_bkl_try_tsc = 0;
+	for(i=0;i<KTRACE_NUM_KERNEL_CALLS;++i)
+		update_stat(&(data->kernel_call_stats[i]),now,ktrace_event);
 
-	/* Update the current avg. */
-	data->bkl_wait_current_avg =
-		(make64(1000000,0)*data->bkl_wait_tsc_delta_sum/
-		data->bkl_wait_samples)/cpu_hz[0];
+	for(i=0;i<KTRACE_NUM_IPCS;++i)
+		update_stat(&(data->ipc_stats[i]),now,ktrace_event);
 }
 
-void ktzprofile_release_bkl(void)
+void ktzprofile_kernel_call(int call_nr)
 {
-	/* Compute the time (in cycles) we spend in the critical section
-	 * (using last_bkl_acquire_tsc), and update the running average of
-	 * the critical section lenght. */
-	u64_t now,delta;
-	struct ktzprofile_data *data;
+	/* Translate the kernel call first. */
+	int translated;
+	call_nr += KERNEL_CALL;
+	if(call_nr<=SYS_SIGRETURN)
+		translated = call_nr;
+	else if(call_nr<=SYS_IRQCTL)
+		translated = call_nr-2;
+	else if(call_nr<=SYS_IOPENABLE)
+		translated = call_nr-3;
+	else if(call_nr<=SYS_SPROF)
+		translated = call_nr-5;
+	else if(call_nr<=SYS_SETTIME)
+		translated = call_nr-7;
+	else if(call_nr<=SYS_RUNCTL)
+		translated = call_nr-9;
+	else if(call_nr<=SYS_PADCONF)
+		translated = call_nr-12;
+	else
+		panic("Not a kernel call.");
+	translated -= KERNEL_CALL;
+	if(!KTRACE_IS_KERNEL_CALL(translated))
+		panic("Not a kernel call.");
+	ktzprofile_event(translated);
+}
 
-	KTZPROFILE_CHECK_ENABLED();
-
-	data = &ktzprofile_per_cpu_data[__gdb_cpuid()];
-	read_tsc_64(&now);
-
-	/* It might happen that we start the profiling between the ACQUIRE and
-	 * RELEASE. In this case the last_bkl_acquire_tsc will not be set (eg.
-	 * default value of 0). If it happens simply ignore this sample. */
-	if(!data->last_bkl_acquire_tsc)
-		return;
-
-	/* Compute the delta cycles between the time we acquired the BKL and
-	 * now. */
-	delta = now-data->last_bkl_acquire_tsc;
-	data->critical_section_tsc_delta_sum += delta;
-	data->critical_section_samples ++;
-
-	data->last_bkl_acquire_tsc = 0;
-
-	/* Update the current avg. */
-	data->critical_section_current_avg =
-		(make64(1000000,0)*data->critical_section_tsc_delta_sum/
-		data->critical_section_samples)/cpu_hz[0];
+void ktzprofile_ipc(int call_nr)
+{
+	int translated;
+	if(call_nr==SENDA)
+		translated = KTRACE_SENDA;
+	else
+		translated = KTRACE_EVENT_LOW+46-1+call_nr;
+	if(!KTRACE_IS_IPC(translated))
+		panic("Not an IPC event.");
+	ktzprofile_event(translated);
 }

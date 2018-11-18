@@ -238,6 +238,9 @@ void context_stop(struct proc * p)
 		read_tsc_64(&bkl_tsc);
 		/* this only gives a good estimate */
 		succ = big_kernel_lock.val;
+
+		/* We are leaving user space now. */
+		ktzprofile_event(KTRACE_USER_STOP);
 		
 		BKL_LOCK();
 		

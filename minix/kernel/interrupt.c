@@ -117,7 +117,6 @@ void irq_handle(int irq)
 {
   irq_hook_t * hook;
 
-  reg_irq(irq);
   /* here we need not to get this IRQ until all the handlers had a say */
   assert(irq >= 0 && irq < NR_IRQ_VECTORS);
   hw_intr_mask(irq);

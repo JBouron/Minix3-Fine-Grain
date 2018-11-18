@@ -211,26 +211,20 @@
 #  define SYS_PRIVCTL    (KERNEL_CALL + 4)	/* sys_privctl() */
 #  define SYS_TRACE      (KERNEL_CALL + 5)	/* sys_trace() */
 #  define SYS_KILL       (KERNEL_CALL + 6)	/* sys_kill() */
-
 #  define SYS_GETKSIG    (KERNEL_CALL + 7)	/* sys_getsig() */
 #  define SYS_ENDKSIG    (KERNEL_CALL + 8)	/* sys_endsig() */
 #  define SYS_SIGSEND    (KERNEL_CALL + 9)	/* sys_sigsend() */
 #  define SYS_SIGRETURN  (KERNEL_CALL + 10)	/* sys_sigreturn() */
-
 #  define SYS_MEMSET     (KERNEL_CALL + 13)	/* sys_memset() */
-
 #  define SYS_UMAP       (KERNEL_CALL + 14)	/* sys_umap() */
 #  define SYS_VIRCOPY    (KERNEL_CALL + 15)	/* sys_vircopy() */
 #  define SYS_PHYSCOPY   (KERNEL_CALL + 16) 	/* sys_physcopy() */
 #  define SYS_UMAP_REMOTE (KERNEL_CALL + 17)	/* sys_umap_remote() */
 #  define SYS_VUMAP      (KERNEL_CALL + 18)	/* sys_vumap() */
-
 #  define SYS_IRQCTL     (KERNEL_CALL + 19)	/* sys_irqctl() */
-
 #  define SYS_DEVIO      (KERNEL_CALL + 21)	/* sys_devio() */
 #  define SYS_SDEVIO     (KERNEL_CALL + 22)	/* sys_sdevio() */
 #  define SYS_VDEVIO     (KERNEL_CALL + 23)	/* sys_vdevio() */
-
 #  define SYS_SETALARM	 (KERNEL_CALL + 24)	/* sys_setalarm() */
 #  define SYS_TIMES	 (KERNEL_CALL + 25)	/* sys_times() */
 #  define SYS_GETINFO    (KERNEL_CALL + 26) 	/* sys_getinfo() */
@@ -241,29 +235,20 @@
 #  define SYS_VSAFECOPY  (KERNEL_CALL + 33)	/* sys_vsafecopy() */
 #  define SYS_SETGRANT   (KERNEL_CALL + 34)	/* sys_setgrant() */
 #  define SYS_READBIOS   (KERNEL_CALL + 35)	/* sys_readbios() */
-
 #  define SYS_SPROF      (KERNEL_CALL + 36)     /* sys_sprof() */ 
-
 #  define SYS_STIME      (KERNEL_CALL + 39)	/* sys_stime() */
 #  define SYS_SETTIME    (KERNEL_CALL + 40)	/* sys_settime() */
-
 #  define SYS_VMCTL      (KERNEL_CALL + 43)	/* sys_vmctl() */
-
 #  define SYS_DIAGCTL    (KERNEL_CALL + 44)	/* sys_diagctl() */
-
 #  define SYS_VTIMER     (KERNEL_CALL + 45)	/* sys_vtimer() */
 #  define SYS_RUNCTL     (KERNEL_CALL + 46)	/* sys_runctl() */
 #  define SYS_GETMCONTEXT (KERNEL_CALL + 50)    /* sys_getmcontext() */
 #  define SYS_SETMCONTEXT (KERNEL_CALL + 51)    /* sys_setmcontext() */
-
 #  define SYS_UPDATE	 (KERNEL_CALL + 52)	/* sys_update() */
 #  define SYS_EXIT	 (KERNEL_CALL + 53)	/* sys_exit() */
-
 #  define SYS_SCHEDCTL (KERNEL_CALL + 54)	/* sys_schedctl() */
 #  define SYS_STATECTL (KERNEL_CALL + 55)	/* sys_statectl() */
-
 #  define SYS_SAFEMEMSET (KERNEL_CALL + 56)	/* sys_safememset() */
-
 #  define SYS_PADCONF (KERNEL_CALL + 57)	/* sys_padconf() */
 
 /* Total */

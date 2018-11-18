@@ -29,16 +29,67 @@
 #endif
 #include "spinlock.h"
 
-/* Declare vars for kernel entry stats. */
-struct kernel_entry_stats kernel_entries_stats;
-int kernel_entries_reg_enable = 0;
-
-SPINLOCK_DEFINE(ktrace_lock);
-struct kernel_trace_entry ktrace[KTRACE_SIZE];
-unsigned ktrace_idx = 0;
-
 /* dummy for linking */
 char *** _penviron;
+
+const char *ktzprofile_kc_to_str[47] = {
+	"KTRACE_SYS_FORK",
+	"KTRACE_SYS_EXEC",
+	"KTRACE_SYS_CLEAR",
+	"KTRACE_SYS_SCHEDULE",
+	"KTRACE_SYS_PRIVCTL",
+	"KTRACE_SYS_TRACE",
+	"KTRACE_SYS_KILL",
+	"KTRACE_SYS_GETKSIG",
+	"KTRACE_SYS_ENDKSIG",
+	"KTRACE_SYS_SIGSEND",
+	"KTRACE_SYS_SIGRETURN",
+	"KTRACE_SYS_MEMSET",
+	"KTRACE_SYS_UMAP",
+	"KTRACE_SYS_VIRCOPY",
+	"KTRACE_SYS_PHYSCOPY",
+	"KTRACE_SYS_UMAP_REMOTE",
+	"KTRACE_SYS_VUMAP",
+	"KTRACE_SYS_IRQCTL",
+	"KTRACE_SYS_DEVIO",
+	"KTRACE_SYS_SDEVIO",
+	"KTRACE_SYS_VDEVIO",
+	"KTRACE_SYS_SETALARM",
+	"KTRACE_SYS_TIMES",
+	"KTRACE_SYS_GETINFO",
+	"KTRACE_SYS_ABORT",
+	"KTRACE_SYS_IOPENABLE",
+	"KTRACE_SYS_SAFECOPYFROM",
+	"KTRACE_SYS_SAFECOPYTO",
+	"KTRACE_SYS_VSAFECOPY",
+	"KTRACE_SYS_SETGRANT",
+	"KTRACE_SYS_READBIOS",
+	"KTRACE_SYS_SPROF",
+	"KTRACE_SYS_STIME",
+	"KTRACE_SYS_SETTIME",
+	"KTRACE_SYS_VMCTL",
+	"KTRACE_SYS_DIAGCTL",
+	"KTRACE_SYS_VTIMER",
+	"KTRACE_SYS_RUNCTL",
+	"KTRACE_SYS_GETMCONTEXT",
+	"KTRACE_SYS_SETMCONTEXT",
+	"KTRACE_SYS_UPDATE",
+	"KTRACE_SYS_EXIT",
+	"KTRACE_SYS_SCHEDCTL",
+	"KTRACE_SYS_STATECTL",
+	"KTRACE_SYS_SAFEMEMSET",
+	"KTRACE_SYS_PADCONF",
+};
+
+const char *ktzprofile_ipc_to_str[7] ={
+	"KTRACE_SEND",
+	"KTRACE_RECEIVE",
+	"KTRACE_SENDREC",
+	"KTRACE_NOTIFY",
+	"KTRACE_SENDNB",
+	"KTRACE_MINIX_KERNINFO",
+	"KTRACE_SENDA",
+};
 
 /* Prototype declarations for PRIVATE functions. */
 static void announce(void);
@@ -134,6 +185,7 @@ void kmain(kinfo_t *local_cbi)
    */
   int volatile __barrier = 0;
   while (__barrier);
+  ktzprofile_init();
 
   /* bss sanity check */
   assert(bss_test == 0);

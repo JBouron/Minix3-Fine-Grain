@@ -190,8 +190,6 @@ void exception_handler(int is_nested, struct exception_frame * frame)
   
   ep = &ex_data[frame->vector];
 
-  reg_exception(frame->vector);
-
   if (frame->vector == 2) {		/* spurious NMI on some machines */
 	printf("got spurious NMI\n");
 	return;

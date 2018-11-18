@@ -207,6 +207,7 @@ static void idle(void)
 
 	/* start accounting for the idle time */
 	context_stop(proc_addr(KERNEL));
+	ktzprofile_event(KTRACE_IDLE_START);
 #if !SPROFILE
 	halt_cpu();
 	//BKL_LOCK();
@@ -224,6 +225,7 @@ static void idle(void)
 		*v = 0;
 	}
 #endif
+	ktzprofile_event(KTRACE_IDLE_STOP);
 	/*
 	 * end of accounting for the idle task does not happen here, the kernel
 	 * is handling stuff for quite a while before it gets back here!
@@ -466,6 +468,9 @@ check_misc_flags:
 #endif
 	
 	restart_local_timer();
+
+	/* We are definitely going to user space now. Notify the profiler. */
+	ktzprofile_event(KTRACE_USER_START);
 	
 	/*
 	 * restore_user_context() carries out the actual mode switch from kernel
@@ -653,7 +658,7 @@ int do_ipc(reg_t r1, reg_t r2, reg_t r3)
    *   - NOTIFY:  asynchronous call; deliver notification or mark pending
    *   - SENDA:   list of asynchronous send requests
    */
-  reg_ipc_call(call_nr);
+  ktzprofile_ipc(call_nr);
   switch(call_nr) {
   	case SENDREC:
   	case SEND:			

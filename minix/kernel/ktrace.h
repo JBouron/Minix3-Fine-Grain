@@ -1,3 +1,7 @@
+#ifndef KTRACE_H
+#define KTRACE_H
+#include <sys/types.h>
+
 #define KTRACE_EVENT_LOW 0
 
 /* All the kernel calls. */
@@ -62,10 +66,30 @@
 #define KTRACE_BKL_ACQUIRE (KTRACE_EVENT_LOW+54)
 #define KTRACE_BKL_RELEASE (KTRACE_EVENT_LOW+55)
 
+/* IDLE operations. */
+#define KTRACE_IDLE_START (KTRACE_EVENT_LOW+56)
+#define KTRACE_IDLE_STOP (KTRACE_EVENT_LOW+57)
+
+/* USER swtich operations. */
+#define KTRACE_USER_START (KTRACE_EVENT_LOW+58)
+#define KTRACE_USER_STOP (KTRACE_EVENT_LOW+59)
+
 #define KTRACE_EVENT_HIGH KTRACE_BKL_RELEASE
+#define KTRACE_NUM_KERNEL_CALLS ((KTRACE_SYS_PADCONF-KTRACE_SYS_EXEC)+1)
+#define KTRACE_NUM_IPCS ((KTRACE_SENDA-KTRACE_SEND)+1)
+
+#define KTRACE_IS_KERNEL_CALL(event) \
+	(KTRACE_SYS_FORK<=(event)&&(event)<=KTRACE_SYS_PADCONF)
+
+#define KTRACE_IS_IPC(event) \
+	(KTRACE_SEND<=(event)&&(event)<=KTRACE_SENDA)
 
 struct kernel_trace_entry {
 	u64_t timestamp;
 	unsigned char cpu;
 	unsigned char event;
 };
+
+extern const char *ktzprofile_kc_to_str[47];
+extern const char *ktzprofile_ipc_to_str[7];
+#endif
