@@ -290,6 +290,7 @@ static void delivermsg(struct proc *rp)
                 /* Indicate message has been delivered; address is 'used'. */
                 rp->p_delivermsg.m_source = NONE;
                 rp->p_misc_flags &= ~(MF_DELIVERMSG|MF_MSGFAILED);
+		ktzprofile_message_type(rp->p_delivermsg.m_type);
 
                 if(!(rp->p_misc_flags & MF_CONTEXT_SET)) {
                         rp->p_reg.retreg = OK;
@@ -669,8 +670,13 @@ int do_ipc(reg_t r1, reg_t r2, reg_t r3)
   	    /* Process accounting for scheduling */
 	    caller_ptr->p_accounting.ipc_sync++;
 
-  	    return do_sync_ipc(caller_ptr, call_nr, (endpoint_t) r2,
-			    (message *) r3);
+	    message *m = (message *)r3;
+	    if(call_nr==RECEIVE) {
+		    /* Only count the SEND side. */
+		    //ktzprofile_message_type(m->m_type);
+	    }
+
+  	    return do_sync_ipc(caller_ptr, call_nr, (endpoint_t) r2, m);
   	}
   	case SENDA:
   	{
@@ -682,13 +688,15 @@ int do_ipc(reg_t r1, reg_t r2, reg_t r3)
   
   	    /* Process accounting for scheduling */
 	    caller_ptr->p_accounting.ipc_async++;
+
+	    asynmsg_t *amsg = (asynmsg_t *)r3;
  
   	    /* Limit size to something reasonable. An arbitrary choice is 16
   	     * times the number of process table entries.
   	     */
   	    if (msg_size > 16*(NR_TASKS + NR_PROCS))
 	        return EDOM;
-  	    return mini_senda(caller_ptr, (asynmsg_t *) r3, msg_size);
+  	    return mini_senda(caller_ptr, amsg, msg_size);
   	}
   	case MINIX_KERNINFO:
 	{

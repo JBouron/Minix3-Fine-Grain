@@ -181,3 +181,16 @@ void ktzprofile_ipc(int call_nr)
 		panic("Not an IPC event.");
 	ktzprofile_event(translated);
 }
+
+void ktzprofile_message_type(int type) {
+	int bin_idx;
+	struct ktzprofile_data *data;
+
+	KTZPROFILE_CHECK_ENABLED();
+	data = &ktzprofile_per_cpu_data[__gdb_cpuid()];
+	bin_idx = type/KTZPROFILE_MSG_BIN_SIZE;
+	if(bin_idx<0||bin_idx>=KTZPROFILE_MSG_HIST_SIZE)
+		data->hist.invalids++;
+	else
+		data->hist.bins[bin_idx]++;
+}

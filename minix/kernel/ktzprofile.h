@@ -22,6 +22,18 @@ struct ktzprofile_stat {
 	u64_t max_delta_usec;	/* The maximum time(us) spent in [A,B]. */
 };
 
+/* From com.h */
+#define KTZPROFILE_MSG_LOW 0x0
+#define KTZPROFILE_MSG_HIGH 0x1AFF
+#define KTZPROFILE_MSG_BIN_SIZE 0x100
+#define KTZPROFILE_MSG_HIST_SIZE ((KTZPROFILE_MSG_HIGH+1)/KTZPROFILE_MSG_BIN_SIZE)
+struct ktzprofile_msg_type_hist {
+	/* The bins. */
+	int bins[KTZPROFILE_MSG_HIST_SIZE];
+	/* Number of invalid message type witnessed. */
+	int invalids;
+};
+
 /* Contains all the data, per cpu, used to profile the kernel. */
 struct ktzprofile_data {
 	/* TCS during the very first and last samples respectively. */
@@ -42,6 +54,9 @@ struct ktzprofile_data {
 
 	/* Stats for each IPC. */
 	struct ktzprofile_stat ipc_stats[KTRACE_NUM_IPCS];
+
+	/* Histogram of each message type. */
+	struct ktzprofile_msg_type_hist hist;
 };
 
 extern struct ktzprofile_data ktzprofile_per_cpu_data[CONFIG_MAX_CPUS];
@@ -57,4 +72,7 @@ void ktzprofile_kernel_call(int call_nr);
 /* Make the profiler aware of an ipc, Note: call_nr is the "real"
  * call number, that is not KTRACE_*. */
 void ktzprofile_ipc(int call_nr);
+/* Make the profiler aware of a message type being sent.
+ * This is a non timing related stat. */
+void ktzprofile_message_type(int type);
 #endif
