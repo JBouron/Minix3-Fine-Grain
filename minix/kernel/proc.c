@@ -290,7 +290,7 @@ static void delivermsg(struct proc *rp)
                 /* Indicate message has been delivered; address is 'used'. */
                 rp->p_delivermsg.m_source = NONE;
                 rp->p_misc_flags &= ~(MF_DELIVERMSG|MF_MSGFAILED);
-		ktzprofile_message_type(rp->p_delivermsg.m_type);
+		ktzprofile_deliver_msg(&(rp->p_delivermsg));
 
                 if(!(rp->p_misc_flags & MF_CONTEXT_SET)) {
                         rp->p_reg.retreg = OK;
@@ -671,11 +671,6 @@ int do_ipc(reg_t r1, reg_t r2, reg_t r3)
 	    caller_ptr->p_accounting.ipc_sync++;
 
 	    message *m = (message *)r3;
-	    if(call_nr==RECEIVE) {
-		    /* Only count the SEND side. */
-		    //ktzprofile_message_type(m->m_type);
-	    }
-
   	    return do_sync_ipc(caller_ptr, call_nr, (endpoint_t) r2, m);
   	}
   	case SENDA:
