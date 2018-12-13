@@ -158,7 +158,7 @@ void kernel_call(message *m_user, struct proc * caller)
 
 
   /* remember who invoked the kcall so we can bill it its time */
-  kbill_kcall = caller;
+  get_cpulocal_var(bill_kcall) = caller;
 
   kernel_call_finish(caller, &msg, result);
 }

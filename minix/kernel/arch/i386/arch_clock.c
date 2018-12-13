@@ -242,8 +242,6 @@ void context_stop(struct proc * p)
 		/* We are leaving user space now. */
 		ktzprofile_event(KTRACE_USER_STOP);
 		
-		BKL_LOCK();
-		
 		read_tsc_64(&tsc);
 
 		bkl_ticks[cpu] = bkl_ticks[cpu] + tsc - bkl_tsc;
@@ -274,14 +272,14 @@ void context_stop(struct proc * p)
 
 	tsc_delta = tsc - *__tsc_ctr_switch;
 
-	if (kbill_ipc) {
-		kbill_ipc->p_kipc_cycles += tsc_delta;
-		kbill_ipc = NULL;
+	if (get_cpulocal_var(bill_ipc)) {
+		get_cpulocal_var(bill_ipc)->p_kipc_cycles += tsc_delta;
+		get_cpulocal_var(bill_ipc) = NULL;
 	}
 
-	if (kbill_kcall) {
-		kbill_kcall->p_kcall_cycles += tsc_delta;
-		kbill_kcall = NULL;
+	if (get_cpulocal_var(bill_kcall)) {
+		get_cpulocal_var(bill_kcall)->p_kcall_cycles += tsc_delta;
+		get_cpulocal_var(bill_kcall) = NULL;
 	}
 
 	/*
@@ -347,6 +345,8 @@ void context_stop(struct proc * p)
 #ifdef CONFIG_SMP
 	if(must_bkl_unlock) {
 		BKL_UNLOCK();
+	} else {
+		BKL_LOCK();
 	}
 #endif
 }

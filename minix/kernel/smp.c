@@ -3,6 +3,7 @@
 #include "smp.h"
 #include "interrupt.h"
 #include "clock.h"
+#include "spinlock.h"
 
 unsigned ncpus;
 unsigned ht_per_core;
@@ -12,6 +13,8 @@ struct cpu cpus[CONFIG_MAX_CPUS];
 
 /* info passed to another cpu along with a sched ipi */
 struct sched_ipi_data {
+	/* Lock should be acquired when setting or clearing flag/data. */
+	spinlock_t	lock;
 	volatile u32_t	flags;
 	volatile u32_t	data;
 };
@@ -82,6 +85,7 @@ static void smp_schedule_sync(struct proc * p, unsigned task)
 	 * if some other cpu made a request to the same cpu, wait until it is
 	 * done before proceeding
 	 */
+retry:
 	if (sched_ipi_data[cpu].flags != 0) {
 		BKL_UNLOCK();
 		while (sched_ipi_data[cpu].flags != 0) {
@@ -94,8 +98,21 @@ static void smp_schedule_sync(struct proc * p, unsigned task)
 		BKL_LOCK();
 	}
 
-	sched_ipi_data[cpu].data = (u32_t) p;
-	sched_ipi_data[cpu].flags |= task;
+	/* We may have a chance ! */
+	spinlock_lock(&(sched_ipi_data[cpu].lock));
+
+	if (sched_ipi_data[cpu].flags != 0) {
+		/* No luck, try again. */
+		spinlock_unlock(&(sched_ipi_data[cpu].lock));
+		goto retry;
+	} else {
+		/* We got lucky. Set the data and flag. */
+		sched_ipi_data[cpu].data = (u32_t) p;
+		sched_ipi_data[cpu].flags |= task;
+	}
+
+	spinlock_unlock(&(sched_ipi_data[cpu].lock));
+
 	__insn_barrier();
 	arch_send_smp_schedule_ipi(cpu);
 
@@ -158,7 +175,9 @@ void smp_sched_handler(void)
 	unsigned flgs;
 	unsigned cpu = cpuid;
 
+	spinlock_lock(&(sched_ipi_data[cpu].lock));
 	flgs = sched_ipi_data[cpu].flags;
+	spinlock_unlock(&(sched_ipi_data[cpu].lock));
 
 	if (flgs) {
 		struct proc * p;
@@ -183,7 +202,9 @@ void smp_sched_handler(void)
 	}
 
 	__insn_barrier();
+	spinlock_lock(&(sched_ipi_data[cpu].lock));
 	sched_ipi_data[cpu].flags = 0;
+	spinlock_unlock(&(sched_ipi_data[cpu].lock));
 }
 
 /*

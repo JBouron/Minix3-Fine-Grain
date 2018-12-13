@@ -41,6 +41,9 @@ extern struct __cpu_local_vars {
 	struct proc *bill_ptr;/* process to bill for clock ticks */
 	struct proc idle_proc;/* stub for an idle process */
 
+	struct proc *bill_ipc; /* process to bill for ipc. */
+	struct proc *bill_kcall; /* process to bill for kernel call. */
+
 /* 
  * signal whether pagefault is already being handled to detect recursive
  * pagefaults
