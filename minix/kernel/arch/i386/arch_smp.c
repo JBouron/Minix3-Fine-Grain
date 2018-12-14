@@ -69,6 +69,16 @@ void __gdb_bkl_unlock(spinlock_t *lock, int cpu) {
 	fill_stack_trace(lock->unlock_stack_trace, ebp, SPINLOCK_MAX_STACK_DEPTH);
 }
 
+void bkl_lock(void)
+{
+	BKL_LOCK();
+}
+
+void bkl_unlock(void)
+{
+	BKL_UNLOCK();
+}
+
 /*
  * arguments for trampoline. We need to pass the logical cpu id, gdt and idt.
  * They have to be in location which is reachable using absolute addressing in

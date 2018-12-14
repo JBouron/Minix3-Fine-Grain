@@ -210,7 +210,6 @@ void context_stop(struct proc * p)
 	u64_t tsc, tsc_delta;
 	u64_t * __tsc_ctr_switch = get_cpulocal_var_ptr(tsc_ctr_switch);
 	unsigned int cpu, tpt, counter;
-	int acquire_bkl = 0;
 #ifdef CONFIG_SMP
 
 	cpu = cpuid;
@@ -236,7 +235,6 @@ void context_stop(struct proc * p)
 		
 		/* We are entering the kernel thus make sure to grab the BKL
 		 * at the end. */
-		acquire_bkl = 1;
 		read_tsc_64(&bkl_tsc);
 		/* this only gives a good estimate */
 		succ = big_kernel_lock.val;
@@ -343,11 +341,6 @@ void context_stop(struct proc * p)
 	tsc_per_state[cpu][counter] += tsc_delta;
 
 	*__tsc_ctr_switch = tsc;
-
-#ifdef CONFIG_SMP
-	if(acquire_bkl)
-		BKL_LOCK();
-#endif
 }
 
 void context_stop_idle(void)
@@ -361,6 +354,7 @@ void context_stop_idle(void)
 	get_cpu_var(cpu, cpu_is_idle) = 0;
 
 	context_stop(get_cpulocal_var_ptr(idle_proc));
+	BKL_LOCK();
 
 	if (is_idle)
 		restart_local_timer();

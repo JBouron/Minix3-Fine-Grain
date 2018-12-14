@@ -21,6 +21,7 @@ ENTRY(apic_hwint##irq)							\
 	SAVE_PROCESS_CTX(0, KTS_INT_HARD)				;\
 	push	%ebp							;\
 	call	_C_LABEL(context_stop)					;\
+	call	_C_LABEL(bkl_lock)					;\
 	add	$4, %esp						;\
 	movl	$0, %ebp	/* for stack trace */			;\
 	APIC_IRQ_HANDLER(irq)						;\
@@ -50,6 +51,7 @@ ENTRY(apic_hwint##irq)							\
 	SAVE_PROCESS_CTX(0, KTS_INT_HARD)				;\
 	push	%ebp							;\
 	call	_C_LABEL(context_stop)					;\
+	call	_C_LABEL(bkl_lock)					;\
 	add	$4, %esp						;\
 	movl	$0, %ebp		/* for stack trace */		;\
 	LAPIC_INTR_HANDLER(func)					;\

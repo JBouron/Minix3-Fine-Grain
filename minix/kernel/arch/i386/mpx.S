@@ -78,6 +78,7 @@ IMPORT(multiboot_init)
 	push	%ebp							;\
 	movl	$0, %ebp	/* for stack trace */			;\
 	call	_C_LABEL(context_stop)					;\
+	call	_C_LABEL(bkl_lock)					;\
 	add	$4, %esp						;\
 	PIC_IRQ_HANDLER(irq)						;\
 	movb	$END_OF_INT, %al					;\
@@ -138,6 +139,7 @@ ENTRY(hwint07)
 	push	%ebp							;\
 	movl	$0, %ebp	/* for stack trace */			;\
 	call	_C_LABEL(context_stop)					;\
+	call	_C_LABEL(bkl_lock)					;\
 	add	$4, %esp						;\
 	PIC_IRQ_HANDLER(irq)						;\
 	movb	$END_OF_INT, %al					;\
@@ -288,6 +290,7 @@ ENTRY(ipc_entry_common)
 	/* for stack trace */
 	movl	$0, %ebp
 	call	_C_LABEL(context_stop)
+	call	_C_LABEL(bkl_lock)
 	add	$4, %esp
 
 	call	_C_LABEL(do_ipc)
@@ -327,6 +330,7 @@ ENTRY(kernel_call_entry_common)
 	/* for stack trace */
 	movl	$0, %ebp
 	call	_C_LABEL(context_stop)
+	call	_C_LABEL(bkl_lock)
 	add	$4, %esp
 
 	call	_C_LABEL(kernel_call)
@@ -359,6 +363,7 @@ exception_entry_from_user:
 	/* for stack trace clear %ebp */
 	movl	$0, %ebp
 	call	_C_LABEL(context_stop)
+	call	_C_LABEL(bkl_lock)
 	add	$4, %esp
 
 	/*
@@ -542,6 +547,7 @@ LABEL(copr_not_available)
 	push	%ebp
 	mov	$0, %ebp
 	call	_C_LABEL(context_stop)
+	call	_C_LABEL(bkl_lock)
 	call	_C_LABEL(copr_not_available_handler)
 	/* reached upon failure only */
 	jmp	_C_LABEL(switch_to_user)
