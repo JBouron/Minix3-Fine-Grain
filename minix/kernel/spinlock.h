@@ -14,6 +14,15 @@ typedef struct spinlock {
 	u32_t unlock_stack_trace[SPINLOCK_MAX_STACK_DEPTH];
 } spinlock_t;
 
+typedef struct reentrantlock {
+	spinlock_t lock;
+	int owner; /* Owner is <cpu>+1 so that the default value (0) is invalid. */
+	int n_locks; /* Number of times locked by owner. */
+} reentrantlock_t;
+
+void _reentrantlock_lock(reentrantlock_t *rl);
+void _reentrantlock_unlock(reentrantlock_t *rl);
+
 #ifndef CONFIG_SMP
 
 #define SPINLOCK_DEFINE(name)
@@ -22,6 +31,8 @@ typedef struct spinlock {
 #define spinlock_init(sl)
 #define spinlock_lock(sl)
 #define spinlock_unlock(sl)
+#define reetrantlock_lock(rl)
+#define reetrantlock_unlock(rl)
 
 #else
 
@@ -41,11 +52,16 @@ typedef struct spinlock {
 #if CONFIG_MAX_CPUS == 1
 #define spinlock_lock(sl)
 #define spinlock_unlock(sl)
+#define reetrantlock_lock(rl)
+#define reetrantlock_unlock(rl)
 #else
 void arch_spinlock_lock(atomic_t * sl);
 void arch_spinlock_unlock(atomic_t * sl);
 #define spinlock_lock(sl)	arch_spinlock_lock(&((sl)->val))
 #define spinlock_unlock(sl)	arch_spinlock_unlock(&((sl)->val))
+
+#define reetrantlock_lock(rl)	_reentrantlock_lock(&(rl));
+#define reetrantlock_unlock(rl)	_reentrantlock_unlock(&(rl));
 #endif
 
 

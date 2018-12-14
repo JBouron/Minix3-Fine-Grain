@@ -79,6 +79,33 @@ void bkl_unlock(void)
 	BKL_UNLOCK();
 }
 
+void _reentrantlock_lock(reentrantlock_t *rl)
+{
+	int cpu = cpuid;
+	if(rl->owner-1!=cpu) {
+		spinlock_lock(&(rl->lock));
+		rl->owner = cpu+1;
+		assert(rl->n_locks==0);
+		rl->n_locks = 1;
+	} else {
+		/* We already hold this lock, simply update n_locks. */
+		rl->n_locks++;
+	}
+	assert(rl->owner>0);
+}
+
+void _reentrantlock_unlock(reentrantlock_t *rl)
+{
+	int cpu = cpuid;
+	assert(rl->owner-1==cpu);
+	rl->n_locks--;
+
+	/* Reset the owner if we don't hold this lock anymore. */
+	if(!rl->n_locks)
+		rl->owner = 0;
+	spinlock_unlock(&(rl->lock));
+}
+
 /*
  * arguments for trampoline. We need to pass the logical cpu id, gdt and idt.
  * They have to be in location which is reachable using absolute addressing in

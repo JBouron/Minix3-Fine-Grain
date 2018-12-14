@@ -18,6 +18,7 @@
 #include <minix/portio.h>
 #include "const.h"
 #include "priv.h"
+#include "spinlock.h"
 
 struct proc {
   struct stackframe_s p_reg;	/* process' registers saved in stack frame */
@@ -26,6 +27,8 @@ struct proc {
   struct priv *p_priv;		/* system privileges structure */
   volatile u32_t p_rts_flags;	/* process is runnable only if zero */
   volatile u32_t p_misc_flags;	/* flags that do not suspend the process */
+
+  reentrantlock_t p_lock;	/* Lock for the process. */
 
   int __gdb_last_cpu_flag;
   int __gdb_line;
@@ -142,6 +145,10 @@ struct proc {
 
 #endif /* __ASSEMBLY__ */
 
+#define lock_proc(p) _reentrantlock_lock(&((p)->p_lock))
+#define unlock_proc(p) _reentrantlock_unlock(&((p)->p_lock))
+
+
 /* Bits for the runtime flags. A process is runnable iff p_rts_flags == 0. */
 #define RTS_SLOT_FREE	0x01	/* process slot is free */
 #define RTS_PROC_STOP	0x02	/* process has been stopped */
@@ -209,34 +216,44 @@ struct proc {
 /* Set flag and dequeue if the process was runnable. */
 #define RTS_SET(rp, f)							\
 	do {								\
+		lock_proc((rp));					\
 		const int rts = (rp)->p_rts_flags;			\
 		(rp)->p_rts_flags |= (f);				\
-		if(f|RTS_VMINHIBIT) {					\
-			rp->__gdb_last_cpu_flag = cpuid;		\
-			rp->__gdb_line = __LINE__;			\
-			rp->__gdb_file = __FILE__;			\
-		}							\
+		rp->__gdb_last_cpu_flag = cpuid;		\
+		rp->__gdb_line = __LINE__;			\
+		rp->__gdb_file = __FILE__;			\
 		if(rts_f_is_runnable(rts) && !proc_is_runnable(rp)) {	\
 			dequeue(rp);					\
 		}							\
+		unlock_proc((rp));					\
 	} while(0)
 
 /* Clear flag and enqueue if the process was not runnable but is now. */
 #define RTS_UNSET(rp, f) 						\
 	do {								\
+		lock_proc((rp));					\
 		int rts;						\
 		rts = (rp)->p_rts_flags;				\
 		(rp)->p_rts_flags &= ~(f);				\
+		rp->__gdb_last_cpu_flag = cpuid;		\
+		rp->__gdb_line = __LINE__;			\
+		rp->__gdb_file = __FILE__;			\
 		if(!rts_f_is_runnable(rts) && proc_is_runnable(rp)) {	\
 			enqueue(rp);					\
 		}							\
+		unlock_proc((rp));					\
 	} while(0)
 
 /* Set flags to this value. */
 #define RTS_SETFLAGS(rp, f)					\
 	do {								\
+		lock_proc((rp));					\
+		rp->__gdb_last_cpu_flag = cpuid;		\
+		rp->__gdb_line = __LINE__;			\
+		rp->__gdb_file = __FILE__;			\
 		if(proc_is_runnable(rp) && (f)) { dequeue(rp); }		\
 		(rp)->p_rts_flags = (f);				\
+		unlock_proc((rp));					\
 	} while(0)
 
 /* Misc flags */
