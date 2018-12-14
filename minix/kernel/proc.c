@@ -207,6 +207,7 @@ static void idle(void)
 
 	/* start accounting for the idle time */
 	context_stop(proc_addr(KERNEL));
+	BKL_UNLOCK();
 	ktzprofile_event(KTRACE_IDLE_START);
 #if !SPROFILE
 	halt_cpu();
@@ -443,6 +444,7 @@ check_misc_flags:
 	assert(p->p_cpu_time_left);
 
 	context_stop(proc_addr(KERNEL));
+	BKL_UNLOCK();
 
 	/* If the process isn't the owner of FPU, enable the FPU exception */
 	if (get_cpulocal_var(fpu_owner) != p)
@@ -1967,6 +1969,7 @@ void copr_not_available_handler(void)
 
 	*local_fpu_owner = p;
 	context_stop(proc_addr(KERNEL));
+	BKL_UNLOCK();
 	restore_user_context(p);
 	NOT_REACHABLE;
 }

@@ -210,8 +210,8 @@ void context_stop(struct proc * p)
 	u64_t tsc, tsc_delta;
 	u64_t * __tsc_ctr_switch = get_cpulocal_var_ptr(tsc_ctr_switch);
 	unsigned int cpu, tpt, counter;
+	int acquire_bkl = 0;
 #ifdef CONFIG_SMP
-	int must_bkl_unlock = 0;
 
 	cpu = cpuid;
 
@@ -230,11 +230,13 @@ void context_stop(struct proc * p)
 		tmp = tsc - *__tsc_ctr_switch;
 		kernel_ticks[cpu] = kernel_ticks[cpu] + tmp;
 		p->p_cycles = p->p_cycles + tmp;
-		must_bkl_unlock = 1;
 	} else {
 		u64_t bkl_tsc;
 		atomic_t succ;
 		
+		/* We are entering the kernel thus make sure to grab the BKL
+		 * at the end. */
+		acquire_bkl = 1;
 		read_tsc_64(&bkl_tsc);
 		/* this only gives a good estimate */
 		succ = big_kernel_lock.val;
@@ -343,11 +345,8 @@ void context_stop(struct proc * p)
 	*__tsc_ctr_switch = tsc;
 
 #ifdef CONFIG_SMP
-	if(must_bkl_unlock) {
-		BKL_UNLOCK();
-	} else {
+	if(acquire_bkl)
 		BKL_LOCK();
-	}
 #endif
 }
 

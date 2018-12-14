@@ -1,0 +1,7 @@
+* Per process lock:
+	Mainly to protect flags and buffers.
+	Also may be used to copy stuff between procs.
+* Per cpu queue lock:
+	Protect enqueues and dequeues.
+* irq_hooks lock:
+	Protect any mods or reads.
