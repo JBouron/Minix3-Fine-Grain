@@ -45,6 +45,8 @@ void save_local_fpu(struct proc *, int retain);
 void fpu_sigcontext(struct proc *, struct sigframe_sigcontext *fr, struct
 	sigcontext *sc);
 
+void sink(void);
+
 /* main.c */
 #ifndef UNPAGED
 #define kmain __k_unpaged_kmain

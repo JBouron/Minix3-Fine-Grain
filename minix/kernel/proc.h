@@ -29,6 +29,7 @@ struct proc {
   volatile u32_t p_misc_flags;	/* flags that do not suspend the process */
 
   reentrantlock_t p_lock;	/* Lock for the process. */
+  int p_enqueued;		/* Is the lock enqueued on it's cpu ? */
 
   int __gdb_last_cpu_flag;
   int __gdb_line;
@@ -214,47 +215,13 @@ struct proc {
 
 
 /* Set flag and dequeue if the process was runnable. */
-#define RTS_SET(rp, f)							\
-	do {								\
-		lock_proc((rp));					\
-		const int rts = (rp)->p_rts_flags;			\
-		(rp)->p_rts_flags |= (f);				\
-		rp->__gdb_last_cpu_flag = cpuid;		\
-		rp->__gdb_line = __LINE__;			\
-		rp->__gdb_file = __FILE__;			\
-		if(rts_f_is_runnable(rts) && !proc_is_runnable(rp)) {	\
-			dequeue(rp);					\
-		}							\
-		unlock_proc((rp));					\
-	} while(0)
+#define RTS_SET(rp, f) _rts_set(rp,f)
 
 /* Clear flag and enqueue if the process was not runnable but is now. */
-#define RTS_UNSET(rp, f) 						\
-	do {								\
-		lock_proc((rp));					\
-		int rts;						\
-		rts = (rp)->p_rts_flags;				\
-		(rp)->p_rts_flags &= ~(f);				\
-		rp->__gdb_last_cpu_flag = cpuid;		\
-		rp->__gdb_line = __LINE__;			\
-		rp->__gdb_file = __FILE__;			\
-		if(!rts_f_is_runnable(rts) && proc_is_runnable(rp)) {	\
-			enqueue(rp);					\
-		}							\
-		unlock_proc((rp));					\
-	} while(0)
+#define RTS_UNSET(rp, f) _rts_unset(rp,f)
 
 /* Set flags to this value. */
-#define RTS_SETFLAGS(rp, f)					\
-	do {								\
-		lock_proc((rp));					\
-		rp->__gdb_last_cpu_flag = cpuid;		\
-		rp->__gdb_line = __LINE__;			\
-		rp->__gdb_file = __FILE__;			\
-		if(proc_is_runnable(rp) && (f)) { dequeue(rp); }		\
-		(rp)->p_rts_flags = (f);				\
-		unlock_proc((rp));					\
-	} while(0)
+#define RTS_SETFLAGS(rp, f) _rts_setflags(rp,f)
 
 /* Misc flags */
 #define MF_REPLY_PEND	0x001	/* reply to IPC_REQUEST is pending */
@@ -310,6 +277,10 @@ EXTERN struct proc proc[NR_TASKS + NR_PROCS];	/* process table */
 
 int mini_send(struct proc *caller_ptr, endpoint_t dst_e, message *m_ptr,
 	int flags);
+
+void _rts_set(struct proc *p,int flag);
+void _rts_unset(struct proc *p,int flag);
+void _rts_setflags(struct proc *p,int flag);
 
 #endif /* __ASSEMBLY__ */
 

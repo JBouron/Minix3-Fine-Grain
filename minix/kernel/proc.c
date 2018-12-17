@@ -136,6 +136,8 @@ void proc_init(void)
 		rp->p_priority = 0;		/* no priority */
 		rp->p_quantum_size_ms = 0;	/* no quantum size */
 
+		rp->p_enqueued = 0;		/* Proc's not enqueued yet. */
+
 		/* arch-specific initialization */
 		arch_proc_reset(rp);
 	}
@@ -313,6 +315,7 @@ void switch_to_user(void)
 #endif
 
 	p = get_cpulocal_var(proc_ptr);
+
 	/*
 	 * if the current process is still runnable check the misc flags and let
 	 * it run unless it becomes not runnable in the meantime
@@ -1638,6 +1641,8 @@ void enqueue(
       rp->p_nextready = NULL;		/* mark new end */
   }
 
+  rp->p_enqueued = 1;
+
 #ifdef CONFIG_SMP
   /*
    * if the process was enqueued on a different cpu and the cpu is idle, i.e.
@@ -1712,6 +1717,8 @@ static void enqueue_head(struct proc *rp)
 	rdy_head[q] = rp;			/* set new queue head */
   }
 
+  rp->p_enqueued = 1;
+
   /* Make note of when this process was added to queue */
   read_tsc_64(&(get_cpulocal_var(proc_ptr->p_accounting.enter_queue)));
 
@@ -1770,6 +1777,8 @@ void dequeue(struct proc *rp)
       }
       prev_xp = *xpp;				/* save previous in chain */
   }
+
+  rp->p_enqueued = 0;
 
 	
   /* Process accounting for scheduling */
@@ -1993,4 +2002,50 @@ void ser_dump_proc(void)
                         continue;
                 print_proc_recursive(pp);
         }
+}
+
+void sink(void)
+{
+	/* Do nothing. */
+}
+
+void _rts_set(struct proc *p,int flag)
+{
+	lock_proc(p);
+	const int rts = p->p_rts_flags;
+	p->p_rts_flags |= (flag);
+	p->__gdb_last_cpu_flag = cpuid;
+	p->__gdb_line = __LINE__;
+	p->__gdb_file = __FILE__;
+	if(rts_f_is_runnable(rts) && !proc_is_runnable(p)) {
+		dequeue(p);
+	}
+	assert(!p->p_enqueued);
+	unlock_proc(p);
+}
+
+void _rts_unset(struct proc *p,int flag)
+{
+	lock_proc(p);
+	int rts;
+	rts = p->p_rts_flags;
+	p->p_rts_flags &= ~(flag);
+	p->__gdb_last_cpu_flag = cpuid;
+	p->__gdb_line = __LINE__;
+	p->__gdb_file = __FILE__;
+	if(!rts_f_is_runnable(rts) && proc_is_runnable(p)) {
+		enqueue(p);
+	}
+	unlock_proc(p);
+}
+
+void _rts_setflags(struct proc *p,int flag)
+{
+	lock_proc(p);
+	p->__gdb_last_cpu_flag = cpuid;
+	p->__gdb_line = __LINE__;
+	p->__gdb_file = __FILE__;
+	if(proc_is_runnable(p) && (flag)) { dequeue(p); }
+	p->p_rts_flags = (flag);
+	unlock_proc(p);
 }
