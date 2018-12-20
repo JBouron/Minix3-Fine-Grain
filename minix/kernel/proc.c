@@ -42,6 +42,9 @@
 
 #include <minix/syslib.h>
 
+
+static int n_remote_deq;
+static int n_remote_enq;
 /* Scheduling and message passing functions */
 static void idle(void);
 /**
@@ -1625,6 +1628,9 @@ void enqueue(
   
   assert(proc_is_runnable(rp));
 
+  if(cpuid!=rp->p_cpu)
+	  n_remote_enq++;
+
   assert(q >= 0);
 
   rdy_head = get_cpu_var(rp->p_cpu, run_q_head);
@@ -1643,29 +1649,27 @@ void enqueue(
 
   rp->p_enqueued = 1;
 
-#ifdef CONFIG_SMP
-  /*
-   * if the process was enqueued on a different cpu and the cpu is idle, i.e.
-   * the time is off, we need to wake up that cpu and let it schedule this new
-   * process
-   */
-  if (cpuid!=rp->p_cpu&&get_cpu_var(rp->p_cpu, cpu_is_idle)) {
-	  /* Wake up remote cpu. */
-	  smp_schedule(rp->p_cpu);
-  }
-
-  if (!get_cpu_var(rp->p_cpu, cpu_is_idle)) {
-	  /* The dest cpu is not idle, we may need to preempt its current task. */
+  if (cpuid == rp->p_cpu) {
 	  /*
 	   * enqueueing a process with a higher priority than the current one,
 	   * it gets preempted. The current process must be preemptible. Testing
 	   * the priority also makes sure that a process does not preempt itself
 	   */
 	  struct proc * p;
-	  p = get_cpu_var(rp->p_cpu,proc_ptr);
+	  p = get_cpulocal_var(proc_ptr);
 	  assert(p);
-	  if((p->p_priority > rp->p_priority) && (priv(p)->s_flags & PREEMPTIBLE))
+	  if((p->p_priority > rp->p_priority) &&
+			  (priv(p)->s_flags & PREEMPTIBLE))
 		  RTS_SET(p, RTS_PREEMPTED); /* calls dequeue() */
+  }
+#ifdef CONFIG_SMP
+  /*
+   * if the process was enqueued on a different cpu and the cpu is idle, i.e.
+   * the time is off, we need to wake up that cpu and let it schedule this new
+   * process
+   */
+  else if (get_cpu_var(rp->p_cpu, cpu_is_idle)) {
+	  smp_schedule(rp->p_cpu);
   }
 #endif
 
@@ -1695,6 +1699,9 @@ static void enqueue_head(struct proc *rp)
 
   assert(proc_ptr_ok(rp));
   assert(proc_is_runnable(rp));
+
+  if(cpuid!=rp->p_cpu)
+	  n_remote_enq++;
 
   /*
    * the process was runnable without its quantum expired when dequeued. A
@@ -1751,6 +1758,9 @@ void dequeue(struct proc *rp)
   u64_t tsc, tsc_delta;
 
   struct proc **rdy_tail;
+
+  if(cpuid!=rp->p_cpu)
+	  n_remote_deq++;
 
   assert(proc_ptr_ok(rp));
   assert(!proc_is_runnable(rp));
@@ -2045,7 +2055,9 @@ void _rts_setflags(struct proc *p,int flag)
 	p->__gdb_last_cpu_flag = cpuid;
 	p->__gdb_line = __LINE__;
 	p->__gdb_file = __FILE__;
-	if(proc_is_runnable(p) && (flag)) { dequeue(p); }
+	if(proc_is_runnable(p) && (flag)) {
+		dequeue(p);
+	}
 	p->p_rts_flags = (flag);
 	unlock_proc(p);
 }
