@@ -81,10 +81,6 @@ static void smp_schedule_sync(struct proc * p, unsigned task)
 	unsigned cpu = p->p_cpu;
 	unsigned mycpu = cpuid;
 
-	/* TODO: The release and re-acquire of the BKL here violates the lock
-	 * ordering with whatever proc lock we have before calling this
-	 * function, which can lead to a deadlock ! */
-
 	assert(cpu != mycpu);
 	/*
 	 * if some other cpu made a request to the same cpu, wait until it is
@@ -92,15 +88,11 @@ static void smp_schedule_sync(struct proc * p, unsigned task)
 	 */
 retry:
 	if (sched_ipi_data[cpu].flags != 0) {
-		BKL_UNLOCK();
 		while (sched_ipi_data[cpu].flags != 0) {
 			if (sched_ipi_data[mycpu].flags) {
-				BKL_LOCK();
 				smp_sched_handler();
-				BKL_UNLOCK();
 			}
 		}
-		BKL_LOCK();
 	}
 
 	/* We may have a chance ! */
@@ -120,21 +112,19 @@ retry:
 
 	__insn_barrier();
 
-	/* Use a NMI for a dequeue request as the target cpu might be in
-	 * the kernel. */
-	int nmi = task&SCHED_IPI_DEQUEUE;
+	/* We are using NMIs only so that we can keep the BKL while the target
+	 * cpu is completing the request (which doesn't need the BKL).
+	 * Because we don't release and re-acquire the BKL we don't violate
+	 * the lock ordering wrt to the proc lock(s) we may have. */
+	int nmi = 1;
 	arch_send_smp_schedule_ipi(cpu,nmi);
 
 	/* wait until the destination cpu finishes its job */
-	BKL_UNLOCK();
 	while (sched_ipi_data[cpu].flags != 0) {
 		if (sched_ipi_data[mycpu].flags) {
-			BKL_LOCK();
 			smp_sched_handler();
-			BKL_UNLOCK();
 		}
 	}
-	BKL_LOCK();
 }
 
 void smp_schedule_stop_proc(struct proc * p)
