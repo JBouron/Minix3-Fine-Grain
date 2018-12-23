@@ -144,6 +144,9 @@ struct proc {
 #endif
 };
 
+#define lock_proc(p) _reentrantlock_lock(&((p)->p_lock))
+#define unlock_proc(p) _reentrantlock_unlock(&((p)->p_lock))
+
 #endif /* __ASSEMBLY__ */
 
 #define lock_proc(p) _reentrantlock_lock(&((p)->p_lock))
@@ -215,13 +218,31 @@ struct proc {
 
 
 /* Set flag and dequeue if the process was runnable. */
-#define RTS_SET(rp, f) _rts_set(rp,f)
+#define RTS_SET(rp, f) \
+	do { \
+		_rts_set(rp,f); \
+		rp->__gdb_last_cpu_flag = cpuid; \
+		rp->__gdb_line = __LINE__; \
+		rp->__gdb_file = __FILE__; \
+	}while(0)
 
 /* Clear flag and enqueue if the process was not runnable but is now. */
-#define RTS_UNSET(rp, f) _rts_unset(rp,f)
+#define RTS_UNSET(rp, f) \
+	do { \
+		_rts_unset(rp,f); \
+		rp->__gdb_last_cpu_flag = cpuid; \
+		rp->__gdb_line = __LINE__; \
+		rp->__gdb_file = __FILE__; \
+	}while(0)
 
 /* Set flags to this value. */
-#define RTS_SETFLAGS(rp, f) _rts_setflags(rp,f)
+#define RTS_SETFLAGS(rp, f) \
+	do { \
+		_rts_setflags(rp,f); \
+		rp->__gdb_last_cpu_flag = cpuid; \
+		rp->__gdb_line = __LINE__; \
+		rp->__gdb_file = __FILE__; \
+	}while(0)
 
 /* Misc flags */
 #define MF_REPLY_PEND	0x001	/* reply to IPC_REQUEST is pending */

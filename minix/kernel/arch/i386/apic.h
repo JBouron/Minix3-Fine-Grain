@@ -168,6 +168,7 @@ void ioapic_eoi(int irq);
 void dump_apic_irq_state(void);
 
 void apic_send_ipi(unsigned vector, unsigned cpu, int type);
+void apic_send_ipi_nmi(unsigned vector, unsigned cpu, int type);
 
 void apic_ipi_sched_intr(void);
 void apic_ipi_halt_intr(void);

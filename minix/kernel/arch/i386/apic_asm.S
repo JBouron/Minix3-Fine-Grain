@@ -30,7 +30,9 @@ ENTRY(apic_hwint##irq)							\
 0:									\
 	pusha								;\
 	call	_C_LABEL(context_stop_idle)				;\
+	call	_C_LABEL(bkl_lock)					;\
 	APIC_IRQ_HANDLER(irq)						;\
+	call	_C_LABEL(bkl_unlock)					;\
 	CLEAR_IF(10*4(%esp))						;\
 	popa								;\
 	iret								;
@@ -60,7 +62,9 @@ ENTRY(apic_hwint##irq)							\
 0:	\
 	pusha								;\
 	call	_C_LABEL(context_stop_idle)				;\
+	call	_C_LABEL(bkl_lock)					;\
 	LAPIC_INTR_HANDLER(func)					;\
+	call	_C_LABEL(bkl_unlock)					;\
 	CLEAR_IF(10*4(%esp))						;\
 	popa								;\
 	iret								;

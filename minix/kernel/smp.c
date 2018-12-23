@@ -24,6 +24,7 @@ static struct sched_ipi_data  sched_ipi_data[CONFIG_MAX_CPUS];
 #define SCHED_IPI_STOP_PROC	1
 #define SCHED_IPI_VM_INHIBIT	2
 #define SCHED_IPI_SAVE_CTX	4
+#define SCHED_IPI_DEQUEUE	8
 
 static volatile unsigned ap_cpus_booted;
 
@@ -65,7 +66,7 @@ void smp_ipi_halt_handler(void)
 
 void smp_schedule(unsigned cpu)
 {
-	arch_send_smp_schedule_ipi(cpu);
+	arch_send_smp_schedule_ipi(cpu,0);
 }
 
 void smp_sched_handler(void);
@@ -79,6 +80,10 @@ static void smp_schedule_sync(struct proc * p, unsigned task)
 {
 	unsigned cpu = p->p_cpu;
 	unsigned mycpu = cpuid;
+
+	/* TODO: The release and re-acquire of the BKL here violates the lock
+	 * ordering with whatever proc lock we have before calling this
+	 * function, which can lead to a deadlock ! */
 
 	assert(cpu != mycpu);
 	/*
@@ -114,7 +119,11 @@ retry:
 	spinlock_unlock(&(sched_ipi_data[cpu].lock));
 
 	__insn_barrier();
-	arch_send_smp_schedule_ipi(cpu);
+
+	/* Use a NMI for a dequeue request as the target cpu might be in
+	 * the kernel. */
+	int nmi = task&SCHED_IPI_DEQUEUE;
+	arch_send_smp_schedule_ipi(cpu,nmi);
 
 	/* wait until the destination cpu finishes its job */
 	BKL_UNLOCK();
@@ -170,11 +179,18 @@ void smp_schedule_migrate_proc(struct proc * p, unsigned dest_cpu)
 	RTS_UNSET(p, RTS_PROC_STOP);
 }
 
+void smp_dequeue_task(struct proc *p)
+{
+	assert(p->p_enqueued);
+	smp_schedule_sync(p,SCHED_IPI_DEQUEUE);
+}
+
 void smp_sched_handler(void)
 {
 	unsigned flgs;
 	unsigned cpu = cpuid;
 
+	/* TODO: remove lock/unlock here. */
 	spinlock_lock(&(sched_ipi_data[cpu].lock));
 	flgs = sched_ipi_data[cpu].flags;
 	spinlock_unlock(&(sched_ipi_data[cpu].lock));
@@ -198,6 +214,10 @@ void smp_sched_handler(void)
 		}
 		if (flgs & SCHED_IPI_VM_INHIBIT) {
 			RTS_SET(p, RTS_VMINHIBIT);
+		}
+		if (flgs&SCHED_IPI_DEQUEUE) {
+			assert(p->p_cpu==cpuid);
+			dequeue(p);
 		}
 	}
 

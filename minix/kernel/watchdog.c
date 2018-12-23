@@ -51,6 +51,8 @@ static void lockup_check(struct nmi_frame * frame)
 
 void nmi_watchdog_handler(struct nmi_frame * frame)
 {
+	smp_sched_handler();
+	return;
 #if SPROFILE
 	/*
 	 * Do not check for lockups while profiling, it is extremely likely that

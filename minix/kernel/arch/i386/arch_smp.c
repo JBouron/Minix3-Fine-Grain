@@ -97,7 +97,8 @@ void _reentrantlock_lock(reentrantlock_t *rl)
 void _reentrantlock_unlock(reentrantlock_t *rl)
 {
 	int cpu = cpuid;
-	assert(rl->owner-1==cpu);
+	if(!(rl->owner-1==cpu))
+		panic("");
 	rl->n_locks--;
 
 	/* Reset the owner if we don't hold this lock anymore. */
@@ -443,7 +444,10 @@ void arch_smp_halt_cpu(void)
 	for(;;);
 }
 
-void arch_send_smp_schedule_ipi(unsigned cpu)
+void arch_send_smp_schedule_ipi(unsigned cpu,int nmi)
 {
-	apic_send_ipi(APIC_SMP_SCHED_PROC_VECTOR, cpu, APIC_IPI_DEST);
+	if(nmi)
+		apic_send_ipi_nmi(APIC_SMP_SCHED_PROC_VECTOR, cpu, APIC_IPI_DEST);
+	else
+		apic_send_ipi(APIC_SMP_SCHED_PROC_VECTOR, cpu, APIC_IPI_DEST);
 }

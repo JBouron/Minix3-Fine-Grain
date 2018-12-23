@@ -963,7 +963,7 @@ int detect_ioapics(void)
 
 #ifdef CONFIG_SMP
 
-void apic_send_ipi(unsigned vector, unsigned cpu, int type)
+static void _apic_send_ipi(unsigned vector, unsigned cpu, int type, int nmi)
 {
 	u32_t icr1, icr2;
 
@@ -976,6 +976,12 @@ void apic_send_ipi(unsigned vector, unsigned cpu, int type)
 
 	icr1 = lapic_read_icr1() & 0xFFF0F800;
 	icr2 = lapic_read_icr2() & 0xFFFFFF;
+
+	/* Enable NMI Dest mode. */
+	if(nmi)
+		icr1 = icr1|(APIC_ICR_DM_MASK&APIC_ICR_DM_NMI);
+	else
+		icr1 = icr1|(APIC_ICR_DM_MASK&APIC_ICR_DM_FIXED);
 
 	switch (type) {
 		case APIC_IPI_DEST:
@@ -1000,6 +1006,16 @@ void apic_send_ipi(unsigned vector, unsigned cpu, int type)
 			printf("WARNING : unknown send ipi type request\n");
 	}
 
+}
+
+void apic_send_ipi(unsigned vector, unsigned cpu, int type)
+{
+	_apic_send_ipi(vector,cpu,type,0);
+}
+
+void apic_send_ipi_nmi(unsigned vector, unsigned cpu, int type)
+{
+	_apic_send_ipi(vector,cpu,type,1);
 }
 
 int apic_send_startup_ipi(unsigned cpu, phys_bytes trampoline)

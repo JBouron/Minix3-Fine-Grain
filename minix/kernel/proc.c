@@ -196,7 +196,6 @@ static void idle(void)
 	switch_address_space_idle();
 
 #ifdef CONFIG_SMP
-	get_cpulocal_var(cpu_is_idle) = 1;
 	/* we don't need to keep time on APs as it is handled on the BSP */
 	if (cpuid != bsp_cpu_id)
 		stop_local_timer();
@@ -212,7 +211,6 @@ static void idle(void)
 
 	/* start accounting for the idle time */
 	context_stop(proc_addr(KERNEL));
-	BKL_UNLOCK();
 	ktzprofile_event(KTRACE_IDLE_START);
 #if !SPROFILE
 	halt_cpu();
@@ -317,7 +315,11 @@ void switch_to_user(void)
 	int tlb_must_refresh = 0;
 #endif
 
+	/* Release the BKL while choosing. */
+	BKL_UNLOCK();
+
 	p = get_cpulocal_var(proc_ptr);
+	lock_proc(p);
 
 	/*
 	 * if the current process is still runnable check the misc flags and let
@@ -341,6 +343,9 @@ not_runnable_pick_new:
 		}
 	}
 
+	unlock_proc(p);
+	lock_runqueues(cpuid);
+
 	/*
 	 * if we have no process to run, set IDLE as the current process for
 	 * time accounting and put the cpu in an idle state. After the next
@@ -348,8 +353,14 @@ not_runnable_pick_new:
 	 * process. If there is still nothing runnable we "schedule" IDLE again
 	 */
 	while (!(p = pick_proc())) {
+		/* Set the idle state while holding the queue lock to avoid
+		 * race conditions. */
+		get_cpulocal_var(cpu_is_idle) = 1;
+		unlock_runqueues(cpuid);
 		idle();
+		lock_runqueues(cpuid);
 	}
+	unlock_runqueues(cpuid);
 
 	/* update the global variable */
 	get_cpulocal_var(proc_ptr) = p;
@@ -362,7 +373,17 @@ not_runnable_pick_new:
 
 check_misc_flags:
 
-	assert(p);
+	/* Re-acquire BKL for remaining operations. Be careful with the lock
+	 * ordering: Need to re-acquire the lock on the proc as well. */
+	unlock_proc(p);
+	BKL_LOCK();
+	lock_proc(p);
+	if(!proc_is_runnable(p)) {
+		/* Something happened in the lock re-acquisition, retry. */
+		BKL_UNLOCK();
+		goto not_runnable_pick_new;
+	}
+
 	assert(proc_is_runnable(p));
 	while (p->p_misc_flags &
 		(MF_KCALL_RESUME | MF_DELIVERMSG |
@@ -422,8 +443,10 @@ check_misc_flags:
 		 * the selected process might not be runnable anymore. We have
 		 * to checkit and schedule another one
 		 */
-		if (!proc_is_runnable(p))
+		if (!proc_is_runnable(p)) {
+			BKL_UNLOCK();
 			goto not_runnable_pick_new;
+		}
 	}
 	/*
 	 * check the quantum left before it runs again. We must do it only here
@@ -436,8 +459,10 @@ check_misc_flags:
 	 * After handling the misc flags the selected process might not be
 	 * runnable anymore. We have to checkit and schedule another one
 	 */
-	if (!proc_is_runnable(p))
+	if (!proc_is_runnable(p)) {
+		BKL_UNLOCK();
 		goto not_runnable_pick_new;
+	}
 
 	TRACE(VF_SCHEDULING, printf("cpu %d starting %s / %d "
 				"pc 0x%08x\n",
@@ -449,6 +474,7 @@ check_misc_flags:
 	p = arch_finish_switch_to_user();
 	assert(p->p_cpu_time_left);
 
+	unlock_proc(p);
 	context_stop(proc_addr(KERNEL));
 	BKL_UNLOCK();
 
@@ -1624,6 +1650,7 @@ void enqueue(
  * process is assigned to.
  */
   int q = rp->p_priority;	 		/* scheduling queue to use */
+  int wake_remote_cpu = 0;
   struct proc **rdy_head, **rdy_tail;
   
   assert(proc_is_runnable(rp));
@@ -1632,6 +1659,8 @@ void enqueue(
 	  n_remote_enq++;
 
   assert(q >= 0);
+
+  lock_runqueues(rp->p_cpu);
 
   rdy_head = get_cpu_var(rp->p_cpu, run_q_head);
   rdy_tail = get_cpu_var(rp->p_cpu, run_q_tail);
@@ -1646,6 +1675,12 @@ void enqueue(
       rdy_tail[q] = rp;				/* set new queue tail */
       rp->p_nextready = NULL;		/* mark new end */
   }
+
+  /* Check now if we will need to send an IPI to wake the remote cpu.
+   * We need to do this while holding the queue lock of the other cpu to
+   * avoid race conditions. */
+  wake_remote_cpu = (rp->p_cpu!=cpuid)&&get_cpu_var(rp->p_cpu,cpu_is_idle);
+  unlock_runqueues(rp->p_cpu);
 
   rp->p_enqueued = 1;
 
@@ -1668,7 +1703,7 @@ void enqueue(
    * the time is off, we need to wake up that cpu and let it schedule this new
    * process
    */
-  else if (get_cpu_var(rp->p_cpu, cpu_is_idle)) {
+  else if (wake_remote_cpu) {
 	  smp_schedule(rp->p_cpu);
   }
 #endif
@@ -1711,6 +1746,7 @@ static void enqueue_head(struct proc *rp)
 
   assert(q >= 0);
 
+  lock_runqueues(rp->p_cpu);
 
   rdy_head = get_cpu_var(rp->p_cpu, run_q_head);
   rdy_tail = get_cpu_var(rp->p_cpu, run_q_tail);
@@ -1723,6 +1759,8 @@ static void enqueue_head(struct proc *rp)
 	rp->p_nextready = rdy_head[q];		/* chain head of queue */
 	rdy_head[q] = rp;			/* set new queue head */
   }
+
+  unlock_runqueues(rp->p_cpu);
 
   rp->p_enqueued = 1;
 
@@ -1759,15 +1797,16 @@ void dequeue(struct proc *rp)
 
   struct proc **rdy_tail;
 
-  if(cpuid!=rp->p_cpu)
-	  n_remote_deq++;
-
   assert(proc_ptr_ok(rp));
   assert(!proc_is_runnable(rp));
+
+  /* We don't allow remote dequeues anymore. Use IPI instead. */
+  assert(cpuid==rp->p_cpu);
 
   /* Side-effect for kernel: check if the task's stack still is ok? */
   assert (!iskernelp(rp) || *priv(rp)->s_stack_guard == STACK_GUARD);
 
+  lock_runqueues(rp->p_cpu);
   rdy_tail = get_cpu_var(rp->p_cpu, run_q_tail);
 
   /* Now make sure that the process is not in its ready queue. Remove the 
@@ -1787,6 +1826,7 @@ void dequeue(struct proc *rp)
       }
       prev_xp = *xpp;				/* save previous in chain */
   }
+  unlock_runqueues(rp->p_cpu);
 
   rp->p_enqueued = 0;
 
@@ -1833,12 +1873,19 @@ static struct proc * pick_proc(void)
    * If there are no processes ready to run, return NULL.
    */
   rdy_head = get_cpulocal_var(run_q_head);
+retry:
   for (q=0; q < NR_SCHED_QUEUES; q++) {	
 	if(!(rp = rdy_head[q])) {
 		TRACE(VF_PICKPROC, printf("cpu %d queue %d empty\n", cpuid, q););
 		continue;
 	}
-	assert(proc_is_runnable(rp));
+	lock_proc(rp);
+	if(!proc_is_runnable(rp)) {
+		/* rp may not be runnable if we received a dequeue IPI during
+		 * the pick_proc. In this case simply retry the pick proc. */
+		unlock_proc(rp);
+		goto retry;
+	}
 	if (priv(rp)->s_flags & BILLABLE)	 	
 		get_cpulocal_var(bill_ptr) = rp; /* bill for system time */
 	return rp;
@@ -2028,7 +2075,10 @@ void _rts_set(struct proc *p,int flag)
 	p->__gdb_line = __LINE__;
 	p->__gdb_file = __FILE__;
 	if(rts_f_is_runnable(rts) && !proc_is_runnable(p)) {
-		dequeue(p);
+		if(cpuid!=p->p_cpu)
+			smp_dequeue_task(p);
+		else
+			dequeue(p);
 	}
 	assert(!p->p_enqueued);
 	unlock_proc(p);
@@ -2052,12 +2102,12 @@ void _rts_unset(struct proc *p,int flag)
 void _rts_setflags(struct proc *p,int flag)
 {
 	lock_proc(p);
-	p->__gdb_last_cpu_flag = cpuid;
-	p->__gdb_line = __LINE__;
-	p->__gdb_file = __FILE__;
-	if(proc_is_runnable(p) && (flag)) {
-		dequeue(p);
-	}
 	p->p_rts_flags = (flag);
+	if(proc_is_runnable(p) && (flag)) {
+		if(cpuid!=p->p_cpu)
+			smp_dequeue_task(p);
+		else
+			dequeue(p);
+	}
 	unlock_proc(p);
 }

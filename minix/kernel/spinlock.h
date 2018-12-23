@@ -16,8 +16,8 @@ typedef struct spinlock {
 
 typedef struct reentrantlock {
 	spinlock_t lock;
-	int owner; /* Owner is <cpu>+1 so that the default value (0) is invalid. */
-	int n_locks; /* Number of times locked by owner. */
+	volatile int owner; /* Owner is <cpu>+1 so that the default value (0) is invalid. */
+	volatile int n_locks; /* Number of times locked by owner. */
 } reentrantlock_t;
 
 void _reentrantlock_lock(reentrantlock_t *rl);

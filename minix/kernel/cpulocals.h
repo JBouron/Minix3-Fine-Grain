@@ -15,6 +15,9 @@
 #define get_cpulocal_var(name)		get_cpu_var(cpuid, name)
 #define get_cpulocal_var_ptr(name)	get_cpu_var_ptr(cpuid, name)
 
+#define lock_runqueues(cpu) _reentrantlock_lock(&(__cpu_local_vars[cpu].q_lock))
+#define unlock_runqueues(cpu) _reentrantlock_unlock(&(__cpu_local_vars[cpu].q_lock))
+
 /* FIXME - padd the structure so that items in the array do not share cacheline
  * with other cpus */
 
@@ -29,6 +32,8 @@
 #define get_cpu_var(cpu, name)		get_cpulocal_var(name)
 #define get_cpu_var_ptr(cpu, name)	get_cpulocal_var_ptr(name)
 
+#define lock_runqueues(cpu)
+#define unlock_runqueues(cpu)
 #endif
 
 /*
@@ -43,6 +48,8 @@ extern struct __cpu_local_vars {
 
 	struct proc *bill_ipc; /* process to bill for ipc. */
 	struct proc *bill_kcall; /* process to bill for kernel call. */
+
+	reentrantlock_t q_lock;	/* Run queues lock. Also protects the idle state. */
 
 /* 
  * signal whether pagefault is already being handled to detect recursive

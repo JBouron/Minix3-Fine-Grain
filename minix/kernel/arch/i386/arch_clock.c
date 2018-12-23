@@ -214,6 +214,8 @@ void context_stop(struct proc * p)
 
 	cpu = cpuid;
 
+	lock_proc(p);
+
 	/*
 	 * This function is called only if we switch from kernel to user or idle
 	 * or back. Therefore this is a perfect location to place the big kernel
@@ -341,6 +343,8 @@ void context_stop(struct proc * p)
 	tsc_per_state[cpu][counter] += tsc_delta;
 
 	*__tsc_ctr_switch = tsc;
+
+	unlock_proc(p);
 }
 
 void context_stop_idle(void)
@@ -354,7 +358,6 @@ void context_stop_idle(void)
 	get_cpu_var(cpu, cpu_is_idle) = 0;
 
 	context_stop(get_cpulocal_var_ptr(idle_proc));
-	BKL_LOCK();
 
 	if (is_idle)
 		restart_local_timer();
