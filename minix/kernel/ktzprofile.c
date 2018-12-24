@@ -163,10 +163,10 @@ void ktzprofile_kernel_call(int call_nr)
 	else if(call_nr<=SYS_PADCONF)
 		translated = call_nr-12;
 	else
-		panic("Not a kernel call.");
+		return;
 	translated -= KERNEL_CALL;
 	if(!KTRACE_IS_KERNEL_CALL(translated))
-		panic("Not a kernel call.");
+		return;
 	ktzprofile_event(translated);
 }
 

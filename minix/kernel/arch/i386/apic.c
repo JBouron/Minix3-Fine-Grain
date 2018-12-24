@@ -427,7 +427,7 @@ static int calib_clk_handler(irq_hook_t * UNUSED(hook))
 		stop_8253A_timer();
 	}
 
-	BKL_UNLOCK();
+	//BKL_UNLOCK();
 	return 1;
 }
 

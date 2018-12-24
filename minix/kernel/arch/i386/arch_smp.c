@@ -54,16 +54,8 @@ void __gdb_bkl_lock(spinlock_t *lock, int cpu) {
 static int __gdb_lock_sanitize = 0;
 void __gdb_bkl_unlock(spinlock_t *lock, int cpu) {
 	/* WARNING: This function should be called while the lock is held. */
-	if (__gdb_lock_sanitize) {
-		int owner = lock->owner;
-		if (owner != cpu && owner >= 0) {
-			panic("Lock owned by %d but unlocked by %d\n",
-			      owner, cpu);
-		} else if (owner == -1) {
-			/* This is not as bad, print for now. */
-			printf("Unlocking non-acquired lock\n");
-		}
-	}
+	volatile int owner = lock->owner;
+	assert(owner==cpu);
 	lock->owner = -1;
 	u32_t ebp = get_stack_frame();
 	fill_stack_trace(lock->unlock_stack_trace, ebp, SPINLOCK_MAX_STACK_DEPTH);
