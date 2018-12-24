@@ -97,14 +97,14 @@ void _reentrantlock_lock(reentrantlock_t *rl)
 void _reentrantlock_unlock(reentrantlock_t *rl)
 {
 	int cpu = cpuid;
-	if(!(rl->owner-1==cpu))
-		panic("");
+	assert(rl->owner-1==cpu);
 	rl->n_locks--;
 
 	/* Reset the owner if we don't hold this lock anymore. */
-	if(!rl->n_locks)
+	if(!rl->n_locks) {
 		rl->owner = 0;
-	spinlock_unlock(&(rl->lock));
+		spinlock_unlock(&(rl->lock));
+	}
 }
 
 /*
