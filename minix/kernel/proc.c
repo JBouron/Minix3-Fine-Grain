@@ -315,9 +315,6 @@ void switch_to_user(void)
 	int tlb_must_refresh = 0;
 #endif
 
-	/* Release the BKL while choosing. */
-	BKL_UNLOCK();
-
 	p = get_cpulocal_var(proc_ptr);
 	lock_proc(p);
 
@@ -642,7 +639,9 @@ int do_ipc(reg_t r1, reg_t r2, reg_t r3)
 {
   struct proc *const caller_ptr = get_cpulocal_var(proc_ptr);	/* get pointer to caller */
   int call_nr = (int) r1;
+  int res = 0;
 
+  BKL_LOCK();
   assert(!RTS_ISSET(caller_ptr, RTS_SLOT_FREE));
 
   /* bill kernel time to this process. */
@@ -668,7 +667,8 @@ int do_ipc(reg_t r1, reg_t r2, reg_t r3)
 		cause_sig(proc_nr(caller_ptr), SIGTRAP);
 
 		/* Preserve the return register's value. */
-		return caller_ptr->p_reg.retreg;
+		res = caller_ptr->p_reg.retreg;
+		goto end;
 	}
 
 	/* If the MF_SC_DEFER flag is set, the syscall is now being resumed. */
@@ -705,7 +705,8 @@ int do_ipc(reg_t r1, reg_t r2, reg_t r3)
 	    caller_ptr->p_accounting.ipc_sync++;
 
 	    message *m = (message *)r3;
-  	    return do_sync_ipc(caller_ptr, call_nr, (endpoint_t) r2, m);
+  	    res = do_sync_ipc(caller_ptr, call_nr, (endpoint_t) r2, m);
+	    goto end;
   	}
   	case SENDA:
   	{
@@ -724,22 +725,31 @@ int do_ipc(reg_t r1, reg_t r2, reg_t r3)
   	     * times the number of process table entries.
   	     */
   	    if (msg_size > 16*(NR_TASKS + NR_PROCS))
-	        return EDOM;
-  	    return mini_senda(caller_ptr, amsg, msg_size);
+			res = EDOM;
+	    else
+		    res = mini_senda(caller_ptr, amsg, msg_size);
+	    goto end;
   	}
   	case MINIX_KERNINFO:
 	{
 		/* It might not be initialized yet. */
 	  	if(!minix_kerninfo_user) {
-			return EBADCALL;
+			res = EBADCALL;
+		} else {
+			arch_set_secondary_ipc_return(caller_ptr, minix_kerninfo_user);
+			res = OK;
 		}
-
-  		arch_set_secondary_ipc_return(caller_ptr, minix_kerninfo_user);
-  		return OK;
+		goto end;
 	}
   	default:
-	return EBADCALL;		/* illegal system call */
+	{
+		res =  EBADCALL;		/* illegal system call */
+		goto end;
+	}
   }
+end:
+  BKL_UNLOCK();
+  return res;
 }
 
 /*===========================================================================*

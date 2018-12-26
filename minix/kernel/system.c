@@ -139,6 +139,8 @@ void kernel_call(message *m_user, struct proc * caller)
   int result = OK;
   message msg;
 
+  BKL_LOCK();
+
   caller->p_delivermsg_vir = (vir_bytes) m_user;
   /*
    * the ldt and cr3 of the caller process is loaded because it just've trapped
@@ -153,6 +155,7 @@ void kernel_call(message *m_user, struct proc * caller)
 	  printf("WARNING wrong user pointer 0x%08x from process %s / %d\n",
 			  m_user, caller->p_name, caller->p_endpoint);
 	  cause_sig(proc_nr(caller), SIGSEGV);
+	  BKL_UNLOCK();
 	  return;
   }
 
@@ -161,6 +164,7 @@ void kernel_call(message *m_user, struct proc * caller)
   get_cpulocal_var(bill_kcall) = caller;
 
   kernel_call_finish(caller, &msg, result);
+  BKL_UNLOCK();
 }
 
 /*===========================================================================*

@@ -164,6 +164,7 @@ void bsp_finish_booting(void)
   kernel_may_alloc = 0;
 
   wait_for_APs_to_finish_booting();
+  BKL_UNLOCK();
   switch_to_user();
   NOT_REACHABLE;
 }

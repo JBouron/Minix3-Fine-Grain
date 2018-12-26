@@ -81,6 +81,7 @@ IMPORT(multiboot_init)
 	call	_C_LABEL(bkl_lock)					;\
 	add	$4, %esp						;\
 	PIC_IRQ_HANDLER(irq)						;\
+	call	_C_LABEL(bkl_unlock)					;\
 	movb	$END_OF_INT, %al					;\
 	outb	$INT_CTL	/* reenable interrupts in master pic */	;\
 	jmp	_C_LABEL(switch_to_user)				;\
@@ -144,6 +145,7 @@ ENTRY(hwint07)
 	call	_C_LABEL(bkl_lock)					;\
 	add	$4, %esp						;\
 	PIC_IRQ_HANDLER(irq)						;\
+	call	_C_LABEL(bkl_unlock)					;\
 	movb	$END_OF_INT, %al					;\
 	outb	$INT_CTL	/* reenable interrupts in master pic */	;\
 	outb	$INT2_CTL	/* reenable slave 8259		  */	;\
@@ -294,7 +296,6 @@ ENTRY(ipc_entry_common)
 	/* for stack trace */
 	movl	$0, %ebp
 	call	_C_LABEL(context_stop)
-	call	_C_LABEL(bkl_lock)
 	add	$4, %esp
 
 	call	_C_LABEL(do_ipc)
@@ -334,7 +335,6 @@ ENTRY(kernel_call_entry_common)
 	/* for stack trace */
 	movl	$0, %ebp
 	call	_C_LABEL(context_stop)
-	call	_C_LABEL(bkl_lock)
 	add	$4, %esp
 
 	call	_C_LABEL(kernel_call)
@@ -378,6 +378,7 @@ exception_entry_from_user:
 	push	%esp
 	push	$0	/* it's not a nested exception */
 	call 	_C_LABEL(exception_handler)
+	call	_C_LABEL(bkl_unlock)
 
 	jmp	_C_LABEL(switch_to_user)
 
@@ -553,6 +554,7 @@ LABEL(copr_not_available)
 	call	_C_LABEL(context_stop)
 	call	_C_LABEL(bkl_lock)
 	call	_C_LABEL(copr_not_available_handler)
+	call	_C_LABEL(bkl_unlock)
 	/* reached upon failure only */
 	jmp	_C_LABEL(switch_to_user)
 

@@ -25,6 +25,7 @@ ENTRY(apic_hwint##irq)							\
 	add	$4, %esp						;\
 	movl	$0, %ebp	/* for stack trace */			;\
 	APIC_IRQ_HANDLER(irq)						;\
+	call	_C_LABEL(bkl_unlock)					;\
 	jmp	_C_LABEL(switch_to_user)				;\
 									\
 0:									\
@@ -57,6 +58,7 @@ ENTRY(apic_hwint##irq)							\
 	add	$4, %esp						;\
 	movl	$0, %ebp		/* for stack trace */		;\
 	LAPIC_INTR_HANDLER(func)					;\
+	call	_C_LABEL(bkl_unlock)					;\
 	jmp	_C_LABEL(switch_to_user)				;\
 	\
 0:	\

@@ -328,6 +328,7 @@ static void ap_finish_booting(void)
 	ap_boot_finished(cpu);
 	spinlock_unlock(&boot_lock);
 
+	BKL_UNLOCK();
 	switch_to_user();
 	NOT_REACHABLE;
 }
