@@ -71,6 +71,22 @@ void bkl_unlock(void)
 	BKL_UNLOCK();
 }
 
+void lock_all_procs(void)
+{
+	int p,nprocs;
+	nprocs = sizeof(proc)/sizeof(struct proc);
+	for(p=0;p<nprocs;++p)
+		lock_proc(&(proc[p]));
+}
+
+void unlock_all_procs(void)
+{
+	int p,nprocs;
+	nprocs = sizeof(proc)/sizeof(struct proc);
+	for(p=0;p<nprocs;++p)
+		unlock_proc(&(proc[p]));
+}
+
 void _reentrantlock_lock(reentrantlock_t *rl)
 {
 	int cpu = cpuid;

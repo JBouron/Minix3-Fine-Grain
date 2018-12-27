@@ -316,7 +316,6 @@ void switch_to_user(void)
 #endif
 
 	p = get_cpulocal_var(proc_ptr);
-	lock_proc(p);
 
 	/*
 	 * if the current process is still runnable check the misc flags and let
@@ -340,7 +339,6 @@ not_runnable_pick_new:
 		}
 	}
 
-	unlock_proc(p);
 	lock_runqueues(cpuid);
 
 	/*
@@ -370,11 +368,7 @@ not_runnable_pick_new:
 
 check_misc_flags:
 
-	/* Re-acquire BKL for remaining operations. Be careful with the lock
-	 * ordering: Need to re-acquire the lock on the proc as well. */
-	unlock_proc(p);
 	BKL_LOCK();
-	lock_proc(p);
 	if(!proc_is_runnable(p)) {
 		/* Something happened in the lock re-acquisition, retry. */
 		BKL_UNLOCK();
@@ -471,9 +465,8 @@ check_misc_flags:
 	p = arch_finish_switch_to_user();
 	assert(p->p_cpu_time_left);
 
-	unlock_proc(p);
-	context_stop(proc_addr(KERNEL));
 	BKL_UNLOCK();
+	context_stop(proc_addr(KERNEL));
 
 	/* If the process isn't the owner of FPU, enable the FPU exception */
 	if (get_cpulocal_var(fpu_owner) != p)
@@ -1889,11 +1882,9 @@ retry:
 		TRACE(VF_PICKPROC, printf("cpu %d queue %d empty\n", cpuid, q););
 		continue;
 	}
-	lock_proc(rp);
 	if(!proc_is_runnable(rp)) {
 		/* rp may not be runnable if we received a dequeue IPI during
 		 * the pick_proc. In this case simply retry the pick proc. */
-		unlock_proc(rp);
 		goto retry;
 	}
 	if (priv(rp)->s_flags & BILLABLE)	 	
@@ -2044,8 +2035,8 @@ void copr_not_available_handler(void)
 	}
 
 	*local_fpu_owner = p;
-	context_stop(proc_addr(KERNEL));
 	BKL_UNLOCK();
+	context_stop(proc_addr(KERNEL));
 	restore_user_context(p);
 	NOT_REACHABLE;
 }
@@ -2078,7 +2069,6 @@ void sink(void)
 
 void _rts_set(struct proc *p,int flag)
 {
-	lock_proc(p);
 	const int rts = p->p_rts_flags;
 	p->p_rts_flags |= (flag);
 	p->__gdb_last_cpu_flag = cpuid;
@@ -2091,12 +2081,10 @@ void _rts_set(struct proc *p,int flag)
 			dequeue(p);
 	}
 	assert(!p->p_enqueued);
-	unlock_proc(p);
 }
 
 void _rts_unset(struct proc *p,int flag)
 {
-	lock_proc(p);
 	int rts;
 	rts = p->p_rts_flags;
 	p->p_rts_flags &= ~(flag);
@@ -2106,12 +2094,10 @@ void _rts_unset(struct proc *p,int flag)
 	if(!rts_f_is_runnable(rts) && proc_is_runnable(p)) {
 		enqueue(p);
 	}
-	unlock_proc(p);
 }
 
 void _rts_setflags(struct proc *p,int flag)
 {
-	lock_proc(p);
 	p->p_rts_flags = (flag);
 	if(proc_is_runnable(p) && (flag)) {
 		if(cpuid!=p->p_cpu)
@@ -2119,5 +2105,4 @@ void _rts_setflags(struct proc *p,int flag)
 		else
 			dequeue(p);
 	}
-	unlock_proc(p);
 }

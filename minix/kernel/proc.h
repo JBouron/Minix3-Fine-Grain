@@ -144,13 +144,13 @@ struct proc {
 #endif
 };
 
-#define lock_proc(p) _reentrantlock_lock(&((p)->p_lock))
-#define unlock_proc(p) _reentrantlock_unlock(&((p)->p_lock))
+#define lock_proc(p) spinlock_lock(&((p)->p_lock.lock))
+#define unlock_proc(p) spinlock_unlock(&((p)->p_lock.lock))
 
 #endif /* __ASSEMBLY__ */
 
-#define lock_proc(p) _reentrantlock_lock(&((p)->p_lock))
-#define unlock_proc(p) _reentrantlock_unlock(&((p)->p_lock))
+#define lock_proc(p) spinlock_lock(&((p)->p_lock.lock))
+#define unlock_proc(p) spinlock_unlock(&((p)->p_lock.lock))
 
 
 /* Bits for the runtime flags. A process is runnable iff p_rts_flags == 0. */

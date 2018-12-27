@@ -74,6 +74,9 @@ volatile int __gdb_lock_owner;
 void __gdb_bkl_lock(spinlock_t *lock, int cpu);
 void __gdb_bkl_unlock(spinlock_t *lock, int cpu);
 
+void lock_all_procs(void);
+void unlock_all_procs(void);
+
 /* To lock/unlock the BKL from asm: */
 void bkl_lock(void);
 void bkl_unlock(void);
@@ -81,7 +84,7 @@ void bkl_unlock(void);
 #define BKL_LOCK() \
 	do { \
 		ktzprofile_event(KTRACE_BKL_TRY); \
-		spinlock_lock(&big_kernel_lock); \
+		lock_all_procs(); \
 		ktzprofile_event(KTRACE_BKL_ACQUIRE); \
 		__gdb_bkl_lock(&big_kernel_lock, cpuid); \
 	} while (0)
@@ -90,7 +93,7 @@ void bkl_unlock(void);
 	do { \
 		__gdb_bkl_unlock(&big_kernel_lock, cpuid); \
 		ktzprofile_event(KTRACE_BKL_RELEASE); \
-		spinlock_unlock(&big_kernel_lock); \
+		unlock_all_procs(); \
 	} while (0)
 
 #endif /* __SPINLOCK_H__ */
