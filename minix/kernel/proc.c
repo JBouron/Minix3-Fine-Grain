@@ -390,44 +390,13 @@ check_misc_flags:
 			delivermsg(p);
 		}
 		else if (p->p_misc_flags & MF_SC_DEFER) {
-			/* Perform the system call that we deferred earlier. */
-
-			assert (!(p->p_misc_flags & MF_SC_ACTIVE));
-
-			arch_do_syscall(p);
-
-			/* If the process is stopped for signal delivery, and
-			 * not blocked sending a message after the system call,
-			 * inform PM.
-			 */
-			if ((p->p_misc_flags & MF_SIG_DELAY) &&
-					!RTS_ISSET(p, RTS_SENDING))
-				sig_delay_done(p);
+			panic("NOT IMPLEMENTED");
 		}
 		else if (p->p_misc_flags & MF_SC_TRACE) {
-			/* Trigger a system call leave event if this was a
-			 * system call. We must do this after processing the
-			 * other flags above, both for tracing correctness and
-			 * to be able to use 'break'.
-			 */
-			if (!(p->p_misc_flags & MF_SC_ACTIVE))
-				break;
-
-			p->p_misc_flags &=
-				~(MF_SC_TRACE | MF_SC_ACTIVE);
-
-			/* Signal the "leave system call" event.
-			 * Block the process.
-			 */
-			cause_sig(proc_nr(p), SIGTRAP);
+			panic("NOT IMPLEMENTED");
 		}
 		else if (p->p_misc_flags & MF_SC_ACTIVE) {
-			/* If MF_SC_ACTIVE was set, remove it now:
-			 * we're leaving the system call.
-			 */
-			p->p_misc_flags &= ~MF_SC_ACTIVE;
-
-			break;
+			panic("NOT IMPLEMENTED");
 		}
 
 		/*
@@ -642,35 +611,7 @@ int do_ipc(reg_t r1, reg_t r2, reg_t r3)
 
   /* If this process is subject to system call tracing, handle that first. */
   if (caller_ptr->p_misc_flags & (MF_SC_TRACE | MF_SC_DEFER)) {
-	/* Are we tracing this process, and is it the first sys_call entry? */
-	if ((caller_ptr->p_misc_flags & (MF_SC_TRACE | MF_SC_DEFER)) ==
-							MF_SC_TRACE) {
-		/* We must notify the tracer before processing the actual
-		 * system call. If we don't, the tracer could not obtain the
-		 * input message. Postpone the entire system call.
-		 */
-		caller_ptr->p_misc_flags &= ~MF_SC_TRACE;
-		assert(!(caller_ptr->p_misc_flags & MF_SC_DEFER));
-		caller_ptr->p_misc_flags |= MF_SC_DEFER;
-		caller_ptr->p_defer.r1 = r1;
-		caller_ptr->p_defer.r2 = r2;
-		caller_ptr->p_defer.r3 = r3;
-
-		/* Signal the "enter system call" event. Block the process. */
-		cause_sig(proc_nr(caller_ptr), SIGTRAP);
-
-		/* Preserve the return register's value. */
-		res = caller_ptr->p_reg.retreg;
-		goto end;
-	}
-
-	/* If the MF_SC_DEFER flag is set, the syscall is now being resumed. */
-	caller_ptr->p_misc_flags &= ~MF_SC_DEFER;
-
-	assert (!(caller_ptr->p_misc_flags & MF_SC_ACTIVE));
-
-	/* Set a flag to allow reliable tracing of leaving the system call. */
-	caller_ptr->p_misc_flags |= MF_SC_ACTIVE;
+	panic("NOT IMPLEMENTED");
   }
 
   if(caller_ptr->p_misc_flags & MF_DELIVERMSG) {
