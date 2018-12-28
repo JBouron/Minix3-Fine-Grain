@@ -123,7 +123,9 @@ static void pagefault( struct proc *pr,
 	m_pagefault.VPF_ADDR = pagefaultcr2;
 	m_pagefault.VPF_FLAGS = frame->errcode;
 
-	if ((err = mini_send(pr, VM_PROC_NR,
+	/* Because we have the BKL here we can call the no_lock variant of
+	 * mini_send. */
+	if ((err = mini_send_no_lock(pr, VM_PROC_NR,
 					&m_pagefault, FROM_KERNEL))) {
 		panic("WARNING: pagefault: mini_send returned %d\n", err);
 	}

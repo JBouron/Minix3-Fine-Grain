@@ -64,7 +64,8 @@ int cancel_async(struct proc *src, struct proc *dst);
 int has_pending_notify(struct proc * caller, int src_p);
 int has_pending_asend(struct proc * caller, int src_p);
 void unset_notify_pending(struct proc * caller, int src_p);
-int mini_notify(const struct proc *src, endpoint_t dst);
+int mini_notify(struct proc *src, endpoint_t dst);
+int mini_notify_no_lock(struct proc *src, endpoint_t dst);
 void vm_suspend(struct proc *caller, const struct proc *target,
         const vir_bytes linaddr, const vir_bytes len, const int type,
         const int writeflag);

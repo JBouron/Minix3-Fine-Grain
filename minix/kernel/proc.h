@@ -296,12 +296,17 @@ struct proc {
 
 EXTERN struct proc proc[NR_TASKS + NR_PROCS];	/* process table */
 
+int mini_send_no_lock(struct proc *caller_ptr, endpoint_t dst_e, message *m_ptr,
+	int flags);
 int mini_send(struct proc *caller_ptr, endpoint_t dst_e, message *m_ptr,
 	int flags);
 
 void _rts_set(struct proc *p,int flag);
 void _rts_unset(struct proc *p,int flag);
 void _rts_setflags(struct proc *p,int flag);
+
+void lock_two_procs(struct proc *p1,struct proc *p2);
+void unlock_two_procs(struct proc *p1,struct proc *p2);
 
 #endif /* __ASSEMBLY__ */
 

@@ -383,7 +383,7 @@ int send_sig(endpoint_t ep, int sig_nr)
   priv = priv(rp);
   if(!priv) return ENOENT;
   sigaddset(&priv->s_sig_pending, sig_nr);
-  mini_notify(proc_addr(SYSTEM), rp->p_endpoint);
+  mini_notify_no_lock(proc_addr(SYSTEM), rp->p_endpoint);
 
   return OK;
 }

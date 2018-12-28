@@ -167,7 +167,7 @@ static int generic_handler(irq_hook_t * hook)
   priv(proc_addr(proc_nr))->s_int_pending |= (1 << hook->notify_id);
 
   /* Build notification message and return. */
-  mini_notify(proc_addr(HARDWARE), hook->proc_nr_e);
+  mini_notify_no_lock(proc_addr(HARDWARE), hook->proc_nr_e);
   return(hook->policy & IRQ_REENABLE);
 }
 

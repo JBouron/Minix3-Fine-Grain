@@ -72,7 +72,7 @@ static void cause_alarm(int proc_nr_e)
  * alarm. The process number is stored as the timer argument. Notify that
  * process with a notification message from CLOCK.
  */
-  mini_notify(proc_addr(CLOCK), proc_nr_e);	/* notify process */
+  mini_notify_no_lock(proc_addr(CLOCK), proc_nr_e);	/* notify process */
 }
 
 #endif /* USE_SETALARM */

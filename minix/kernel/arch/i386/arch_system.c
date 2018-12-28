@@ -421,6 +421,7 @@ static void ser_dump_vfs(void)
 	/* Notify VFS it has to generate stack traces. Kernel can't do that as
 	 * it's not aware of user space threads.
 	 */
+	panic("NOT IMPLEMENTED");
 	mini_notify(proc_addr(KERNEL), VFS_PROC_NR);
 }
 

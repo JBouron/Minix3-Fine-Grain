@@ -54,6 +54,8 @@ static int mini_send(struct proc *caller_ptr, endpoint_t dst_e, message
 */
 static int mini_receive(struct proc *caller_ptr, endpoint_t src,
 	message *m_buff_usr, int flags);
+static int mini_receive_no_lock(struct proc *caller_ptr, endpoint_t src,
+	message *m_buff_usr, int flags);
 static int mini_senda(struct proc *caller_ptr, asynmsg_t *table, size_t
 	size);
 static int deadlock(int function, register struct proc *caller,
@@ -507,11 +509,6 @@ static int do_sync_ipc(struct proc * caller_ptr, /* who made the call */
   {
 	if (call_nr != RECEIVE)
 	{
-#if 0
-		printf("sys_call: %s by %d with bad endpoint %d\n", 
-			callname,
-			proc_nr(caller_ptr), src_dst_e);
-#endif
 		return EINVAL;
 	}
 	src_dst_p = (int) src_dst_e;
@@ -520,11 +517,6 @@ static int do_sync_ipc(struct proc * caller_ptr, /* who made the call */
   {
 	/* Require a valid source and/or destination process. */
 	if(!isokendpt(src_dst_e, &src_dst_p)) {
-#if 0
-		printf("sys_call: %s by %d with bad endpoint %d\n", 
-			callname,
-			proc_nr(caller_ptr), src_dst_e);
-#endif
 		return EDEADSRCDST;
 	}
 
@@ -570,7 +562,16 @@ static int do_sync_ipc(struct proc * caller_ptr, /* who made the call */
   case SENDREC:
 	/* A flag is set so that notifications cannot interrupt SENDREC. */
 	caller_ptr->p_misc_flags |= MF_REPLY_PEND;
-	/* fall through */
+	/* We must do the mini_send and mini_recieve atomically. Thus take
+	 * all the locks for both operations ( which is BKL ) and call the
+	 * non locking variants. */
+	BKL_LOCK();
+	result = mini_send_no_lock(caller_ptr, src_dst_e, m_ptr, 0);
+	if(result==OK) {
+		result = mini_receive_no_lock(caller_ptr, src_dst_e, m_ptr, 0);
+	}
+	BKL_UNLOCK();
+	break;
   case SEND:			
 	result = mini_send(caller_ptr, src_dst_e, m_ptr, 0);
 	if (call_nr == SEND || result != OK)
@@ -603,7 +604,6 @@ int do_ipc(reg_t r1, reg_t r2, reg_t r3)
   int call_nr = (int) r1;
   int res = 0;
 
-  BKL_LOCK();
   assert(!RTS_ISSET(caller_ptr, RTS_SLOT_FREE));
 
   /* bill kernel time to this process. */
@@ -682,7 +682,6 @@ int do_ipc(reg_t r1, reg_t r2, reg_t r3)
 	}
   }
 end:
-  BKL_UNLOCK();
   return res;
 }
 
@@ -856,7 +855,9 @@ void unset_notify_pending(struct proc * caller, int src_p)
 /*===========================================================================*
  *				mini_send				     * 
  *===========================================================================*/
-int mini_send(
+/* This function assumes that all the required locks are taken before calling
+ * it. */
+int mini_send_no_lock(
   register struct proc *caller_ptr,	/* who is trying to send a message? */
   endpoint_t dst_e,			/* to whom is message being sent? */
   message *m_ptr,			/* pointer to message buffer */
@@ -950,10 +951,31 @@ int mini_send(
   return(OK);
 }
 
+int mini_send(
+  register struct proc *caller_ptr,	/* who is trying to send a message? */
+  endpoint_t dst_e,			/* to whom is message being sent? */
+  message *m_ptr,			/* pointer to message buffer */
+  const int flags
+)
+{
+	int dst_p,res;
+	struct proc *dst_ptr;
+
+	/* Take all the necessary locks and call mini_send_no_lock. */
+	dst_p = _ENDPOINT_P(dst_e);
+	dst_ptr = proc_addr(dst_p);
+
+	lock_two_procs(caller_ptr,dst_ptr);
+	res = mini_send_no_lock(caller_ptr,dst_e,m_ptr,flags);
+	unlock_two_procs(caller_ptr,dst_ptr);
+
+	return res;
+}
+
 /*===========================================================================*
  *				mini_receive				     * 
  *===========================================================================*/
-static int mini_receive(struct proc * caller_ptr,
+static int mini_receive_no_lock(struct proc * caller_ptr,
 			endpoint_t src_e, /* which message source is wanted */
 			message * m_buff_usr, /* pointer to message buffer */
 			const int flags)
@@ -1105,11 +1127,25 @@ receive_done:
   return OK;
 }
 
+static int mini_receive(struct proc * caller_ptr,
+			endpoint_t src_e, /* which message source is wanted */
+			message * m_buff_usr, /* pointer to message buffer */
+			const int flags)
+{
+	int res;
+
+	BKL_LOCK();
+	res = mini_receive_no_lock(caller_ptr,src_e,m_buff_usr,flags);
+	BKL_UNLOCK();
+
+	return res;
+}
+
 /*===========================================================================*
  *				mini_notify				     * 
  *===========================================================================*/
-int mini_notify(
-  const struct proc *caller_ptr,	/* sender of the notification */
+int mini_notify_no_lock(
+  struct proc *caller_ptr,	/* sender of the notification */
   endpoint_t dst_e			/* which process to notify */
 )
 {
@@ -1153,6 +1189,27 @@ int mini_notify(
   src_id = priv(caller_ptr)->s_id;
   set_sys_bit(priv(dst_ptr)->s_notify_pending, src_id); 
   return(OK);
+}
+
+int mini_notify(
+  struct proc *caller_ptr,	/* sender of the notification */
+  endpoint_t dst_e			/* which process to notify */
+)
+{
+	int dst_p,res;
+	struct proc *dst_ptr;
+
+	if (!isokendpt(dst_e, &dst_p)) {
+		panic("");
+	}
+
+	dst_ptr = proc_addr(dst_p);
+
+	lock_two_procs(caller_ptr,dst_ptr);
+	res = mini_notify_no_lock(caller_ptr,dst_e);
+	unlock_two_procs(caller_ptr,dst_ptr);
+
+	return res;
 }
 
 #define ASCOMPLAIN(caller, entry, field)	\
@@ -1304,7 +1361,7 @@ asyn_error:
   }
 
   if (do_notify) 
-	mini_notify(proc_addr(ASYNCM), caller_ptr->p_endpoint);
+	mini_notify_no_lock(proc_addr(ASYNCM), caller_ptr->p_endpoint);
 
   if (!done) {
 	privp->s_asyntab = (vir_bytes) table;
@@ -1317,17 +1374,28 @@ asyn_error:
 /*===========================================================================*
  *				mini_senda				     *
  *===========================================================================*/
-static int mini_senda(struct proc *caller_ptr, asynmsg_t *table, size_t size)
+static int mini_senda_no_lock(struct proc *caller_ptr, asynmsg_t *table, size_t size)
 {
   struct priv *privp;
+  int res;
 
   privp = priv(caller_ptr);
   if (!(privp->s_flags & SYS_PROC)) {
 	printf( "mini_senda: warning caller has no privilege structure\n");
-	return(EPERM);
+	return (EPERM);
   }
-
   return try_deliver_senda(caller_ptr, table, size);
+}
+
+static int mini_senda(struct proc *caller_ptr, asynmsg_t *table, size_t size)
+{
+	int res;
+
+	BKL_LOCK();
+	res = mini_senda_no_lock(caller_ptr,table,size);
+	BKL_UNLOCK();
+
+	return res;
 }
 
 
@@ -1479,8 +1547,10 @@ store_result:
 	break;
   }
 
+  /* try_one is only called by mini_received or try_async (which is only called
+   * by mini_received. Thus we have the BKL. */
   if (do_notify) 
-	mini_notify(proc_addr(ASYNCM), src_ptr->p_endpoint);
+	mini_notify_no_lock(proc_addr(ASYNCM), src_ptr->p_endpoint);
 
   if (done) {
 	privp->s_asyntab = -1;
@@ -1566,8 +1636,9 @@ int cancel_async(struct proc *src_ptr, struct proc *dst_ptr)
 	A_INSRT(i);	/* Copy results to sender; ignore errors */
   }
 
+  /* Called by clear_ipc_ref called by kernel_call thus BKL. */
   if (do_notify) 
-	mini_notify(proc_addr(ASYNCM), src_ptr->p_endpoint);
+	mini_notify_no_lock(proc_addr(ASYNCM), src_ptr->p_endpoint);
 
   if (!done) {
 	privp->s_asyntab = table_v;
@@ -1907,7 +1978,8 @@ static void notify_scheduler(struct proc *p)
 	/* Reset accounting */
 	reset_proc_accounting(p);
 
-	if ((err = mini_send(p, p->p_scheduler->p_endpoint,
+	/* We have BKL. */
+	if ((err = mini_send_no_lock(p, p->p_scheduler->p_endpoint,
 					&m_no_quantum, FROM_KERNEL))) {
 		panic("WARNING: Scheduling: mini_send returned %d\n", err);
 	}
@@ -2045,5 +2117,27 @@ void _rts_setflags(struct proc *p,int flag)
 			smp_dequeue_task(p);
 		else
 			dequeue(p);
+	}
+}
+
+void lock_two_procs(struct proc *p1,struct proc *p2)
+{
+	if(p1<p2) {
+		lock_proc(p1);
+		lock_proc(p2);
+	} else {
+		lock_proc(p2);
+		lock_proc(p1);
+	}
+}
+
+void unlock_two_procs(struct proc *p1,struct proc *p2)
+{
+	if(p1<p2) {
+		unlock_proc(p2);
+		unlock_proc(p1);
+	} else {
+		unlock_proc(p1);
+		unlock_proc(p2);
 	}
 }

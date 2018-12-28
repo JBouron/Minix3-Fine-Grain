@@ -2814,7 +2814,17 @@ static inline int _ipc_sendrec(endpoint_t src_dest, message *m_ptr)
 
 static inline int _ipc_sendnb(endpoint_t dest, message *m_ptr)
 {
-	return _minix_ipcvecs.sendnb(dest, m_ptr);
+	int tries,max_tries,res;
+
+	max_tries = 1;
+#define ENOTREADY -201 /* Re-def it here. Hack. */
+	res = ENOTREADY;
+
+	for(tries=0;tries<max_tries&&res==ENOTREADY;++tries) {
+		tries++;
+		res = _minix_ipcvecs.sendnb(dest, m_ptr);
+	}
+	return res;
 }
 
 static inline int _ipc_notify(endpoint_t dest)

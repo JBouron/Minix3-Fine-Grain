@@ -641,18 +641,13 @@ void reply(message *m_out, endpoint_t whom, int result)
   int r;
 
   m_out->m_type = result;
-retry:
+
   r = ipc_sendnb(whom, m_out);
   if (r != OK) {
 	printf("VFS: %d couldn't send reply %d to %d: %d\n", mthread_self(),
 		result, whom, r);
 	util_stacktrace();
   }
-  /* The dest endpoint was simply not ready for this message. Do not give up !
-   * as it might wait forever !!!
-   */
-  if(r==ENOTREADY)
-	  goto retry;
 }
 
 /*===========================================================================*
