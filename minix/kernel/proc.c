@@ -52,10 +52,16 @@ static void idle(void);
 static int mini_send(struct proc *caller_ptr, endpoint_t dst_e, message
 	*m_ptr, int flags);
 */
+static int mini_sendrec(struct proc *caller_ptr, endpoint_t src,
+	message *m_buff_usr, int flags);
+static int mini_sendrec_no_lock(struct proc *caller_ptr, endpoint_t src,
+	message *m_buff_usr, int flags);
+
 static int mini_receive(struct proc *caller_ptr, endpoint_t src,
 	message *m_buff_usr, int flags);
 static int mini_receive_no_lock(struct proc *caller_ptr, endpoint_t src,
 	message *m_buff_usr, int flags);
+
 static int mini_senda(struct proc *caller_ptr, asynmsg_t *table, size_t
 	size);
 static int deadlock(int function, register struct proc *caller,
@@ -142,6 +148,7 @@ void proc_init(void)
 		rp->p_quantum_size_ms = 0;	/* no quantum size */
 
 		rp->p_enqueued = 0;		/* Proc's not enqueued yet. */
+		rp->p_deliver_type = MSG_TYPE_NULL;	/* No message received yet. */
 
 		/* arch-specific initialization */
 		arch_proc_reset(rp);
@@ -560,17 +567,7 @@ static int do_sync_ipc(struct proc * caller_ptr, /* who made the call */
 
   switch(call_nr) {
   case SENDREC:
-	/* A flag is set so that notifications cannot interrupt SENDREC. */
-	caller_ptr->p_misc_flags |= MF_REPLY_PEND;
-	/* We must do the mini_send and mini_recieve atomically. Thus take
-	 * all the locks for both operations ( which is BKL ) and call the
-	 * non locking variants. */
-	BKL_LOCK();
-	result = mini_send_no_lock(caller_ptr, src_dst_e, m_ptr, 0);
-	if(result==OK) {
-		result = mini_receive_no_lock(caller_ptr, src_dst_e, m_ptr, 0);
-	}
-	BKL_UNLOCK();
+	result = mini_sendrec(caller_ptr, src_dst_e, m_ptr, 0);
 	break;
   case SEND:			
 	result = mini_send(caller_ptr, src_dst_e, m_ptr, 0);
@@ -905,6 +902,8 @@ int mini_send_no_lock(
 	if (dst_ptr->p_misc_flags & MF_REPLY_PEND)
 		dst_ptr->p_misc_flags &= ~MF_REPLY_PEND;
 
+	assert(dst_ptr->p_deliver_type==MSG_TYPE_NULL);
+	dst_ptr->p_deliver_type = MSG_TYPE_NORMAL;
 	RTS_UNSET(dst_ptr, RTS_RECEIVING);
 
 #if DEBUG_IPC_HOOK
@@ -973,6 +972,42 @@ int mini_send(
 }
 
 /*===========================================================================*
+ *				mini_sendrec				     * 
+ *===========================================================================*/
+static int mini_sendrec_no_lock(struct proc *caller_ptr, endpoint_t src,
+	message *m_buff_usr, int flags)
+{
+	int other_p,result;
+	/* A flag is set so that notifications cannot interrupt SENDREC. */
+	caller_ptr->p_misc_flags |= MF_REPLY_PEND;
+	result = mini_send_no_lock(caller_ptr, src, m_buff_usr, 0);
+	if(result==OK) {
+		result = mini_receive_no_lock(caller_ptr, src, m_buff_usr, 0);
+	}
+	return result;
+}
+
+static int mini_sendrec(struct proc *caller_ptr, endpoint_t src,
+	message *m_buff_usr, int flags)
+{
+	int other_p,res;
+	struct proc *other_ptr;
+
+	other_p = _ENDPOINT_P(src);
+	other_ptr = proc_addr(other_p);
+
+	/* We need to take the union of the locks needed for send and 
+	 * receive. Which in our case is the caller and the other proc (as the
+	 * receive is not ANY. */
+
+	lock_two_procs(caller_ptr,other_ptr);
+	res = mini_sendrec_no_lock(caller_ptr,src,m_buff_usr,flags);
+	unlock_two_procs(caller_ptr,other_ptr);
+
+	return res;
+}
+
+/*===========================================================================*
  *				mini_receive				     * 
  *===========================================================================*/
 static int mini_receive_no_lock(struct proc * caller_ptr,
@@ -993,8 +1028,12 @@ static int mini_receive_no_lock(struct proc * caller_ptr,
   /* This is where we want our message. */
   caller_ptr->p_delivermsg_vir = (vir_bytes) m_buff_usr;
 
-  if(src_e == ANY) src_p = ANY;
-  else
+  get_cpulocal_var(n_receive)++;
+
+  if(src_e == ANY) {
+	  src_p = ANY;
+	  get_cpulocal_var(n_receive_any)++;
+  } else
   {
 	okendpt(src_e, &src_p);
 	if (RTS_ISSET(proc_addr(src_p), RTS_NO_ENDPOINT))
@@ -1101,6 +1140,7 @@ static int mini_receive_no_lock(struct proc * caller_ptr,
 	    sender->p_q_link = NULL;
 	    goto receive_done;
 	}
+	assert(src_e!=ANY);
 	xpp = &sender->p_q_link;		/* proceed to next */
     }
   }
@@ -1115,6 +1155,7 @@ static int mini_receive_no_lock(struct proc * caller_ptr,
       }
 
       caller_ptr->p_getfrom_e = src_e;		
+      caller_ptr->p_deliver_type = MSG_TYPE_NULL;
       RTS_SET(caller_ptr, RTS_RECEIVING);
       return(OK);
   } else {
@@ -1132,11 +1173,41 @@ static int mini_receive(struct proc * caller_ptr,
 			message * m_buff_usr, /* pointer to message buffer */
 			const int flags)
 {
-	int res;
+	int res,src_p;
+	struct proc *src_ptr;
 
-	BKL_LOCK();
+	src_p = _ENDPOINT_P(src_e);
+	src_ptr = proc_addr(src_p);
+
+	/* If we are receiving from a specific source lock only the caller and
+	 * the source. */
+ 	if(src_e == ANY) {
+		BKL_LOCK();
+	} else {
+		/* TODO: When dealing with ANY we need to be a bit more careful.
+		 * In this case we can deliver the message in 3 ways:
+		 * 	_ A pending notification.
+		 * 	_ A pending async message.
+		 * 	_ A process in the wait queue.
+		 *
+		 * mini_receive will try the three ways (in that order) and
+		 * deliver the first message it finds.
+		 * The difficult thing here is to lock correctly (wrt the
+		 * order). Thus locking inside each way would be very
+		 * difficult.
+		 * What we do here is "emulate" the three checks and lock the
+		 * procs that would be used for each case. Once we have all
+		 * the procs we can lock them.
+		 */
+		lock_two_procs(caller_ptr,src_ptr);
+	}
+
 	res = mini_receive_no_lock(caller_ptr,src_e,m_buff_usr,flags);
-	BKL_UNLOCK();
+
+	if(src_e==ANY)
+		BKL_UNLOCK();
+	else
+		unlock_two_procs(caller_ptr,src_ptr);
 
 	return res;
 }
@@ -1175,6 +1246,9 @@ int mini_notify_no_lock(
       BuildNotifyMessage(&dst_ptr->p_delivermsg, proc_nr(caller_ptr), dst_ptr);
       dst_ptr->p_delivermsg.m_source = caller_ptr->p_endpoint;
       dst_ptr->p_misc_flags |= MF_DELIVERMSG;
+
+	assert(dst_ptr->p_deliver_type==MSG_TYPE_NULL);
+	dst_ptr->p_deliver_type = MSG_TYPE_NOTIFY;
 
       IPC_STATUS_ADD_CALL(dst_ptr, NOTIFY);
       RTS_UNSET(dst_ptr, RTS_RECEIVING);
@@ -1331,6 +1405,8 @@ int try_deliver_senda(struct proc *caller_ptr,
 		dst_ptr->p_delivermsg.m_source = caller_ptr->p_endpoint;
 		dst_ptr->p_misc_flags |= MF_DELIVERMSG;
 		IPC_STATUS_ADD_CALL(dst_ptr, SENDA);
+		assert(dst_ptr->p_deliver_type==MSG_TYPE_NULL);
+		dst_ptr->p_deliver_type = MSG_TYPE_ASYNC;
 		RTS_UNSET(dst_ptr, RTS_RECEIVING);
 #if DEBUG_IPC_HOOK
 		hook_ipc_msgrecv(&dst_ptr->p_delivermsg, caller_ptr, dst_ptr);

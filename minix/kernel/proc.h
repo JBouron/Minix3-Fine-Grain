@@ -30,6 +30,7 @@ struct proc {
 
   reentrantlock_t p_lock;	/* Lock for the process. */
   int p_enqueued;		/* Is the lock enqueued on it's cpu ? */
+  int p_deliver_type;		/* What kind of message has been delivered ? */
 
   int __gdb_last_cpu_flag;
   int __gdb_line;
@@ -179,6 +180,12 @@ struct proc {
 				   should be enqueued at the end of some run
 				   queue again */
 #define RTS_BOOTINHIBIT	0x10000	/* not ready until VM has made it */
+
+/* Values for the p_deliver_type field. */
+#define MSG_TYPE_NULL		0x0	/* No message. */
+#define MSG_TYPE_NOTIFY	0x1	/* Nofity message. */
+#define MSG_TYPE_ASYNC	0x2	/* Async message. */
+#define MSG_TYPE_NORMAL	0x2	/* A normal message. */
 
 /* A process is runnable iff p_rts_flags == 0. */
 #define rts_f_is_runnable(flg)	((flg) == 0)

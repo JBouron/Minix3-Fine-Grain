@@ -536,6 +536,7 @@ static void clear_ipc(
       }
       RTS_UNSET(rc, RTS_SENDING);
   }
+  rc->p_deliver_type = MSG_TYPE_NULL;
   RTS_UNSET(rc, RTS_RECEIVING);
 }
 

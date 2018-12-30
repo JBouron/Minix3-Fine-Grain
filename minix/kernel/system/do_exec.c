@@ -48,6 +48,7 @@ int do_exec(struct proc * caller, message * m_ptr)
 	(u32_t) m_ptr->m_lsys_krn_sys_exec.ps_str, name);
 
   /* No reply to EXEC call */
+  rp->p_deliver_type = MSG_TYPE_NULL; /* Just to be safe. */
   RTS_UNSET(rp, RTS_RECEIVING);
 
   /* Mark fpu_regs contents as not significant, so fpu

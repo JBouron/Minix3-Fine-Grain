@@ -51,6 +51,9 @@ extern struct __cpu_local_vars {
 
 	reentrantlock_t q_lock;	/* Run queues lock. Also protects the idle state. */
 
+	int n_receive;
+	int n_receive_any;
+
 /* 
  * signal whether pagefault is already being handled to detect recursive
  * pagefaults
