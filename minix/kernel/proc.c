@@ -1168,23 +1168,74 @@ receive_done:
   return OK;
 }
 
+/*
+ * Return the next pending notif. Should be called with lock on caller_ptr.
+ */
+static struct proc *peek_pending_notif(struct proc *caller_ptr)
+{
+        int src_id = has_pending_notify(caller_ptr,ANY);
+        if(src_id!=NULL_PRIV_ID) {
+		return proc_addr(id_to_nr(src_id));
+        } else {
+		return NULL;
+	}
+}
+
+static struct proc *peek_pending_async(struct proc *caller_ptr)
+{
+	/* TODO: This is a copy-pasta from try_async, needs to be cleaned. */
+	int r;
+	struct priv *privp;
+	struct proc *src_ptr;
+	sys_map_t *map;
+
+	map = &priv(caller_ptr)->s_asyn_pending;
+
+	/* Try all privilege structures */
+	for (privp = BEG_PRIV_ADDR; privp < END_PRIV_ADDR; ++privp)  {
+		if (privp->s_proc_nr == NONE)
+			continue;
+
+		if (!get_sys_bit(*map, privp->s_id)) 
+			continue;
+
+		src_ptr = proc_addr(privp->s_proc_nr);
+
+#ifdef CONFIG_SMP
+		/*
+		 * Do not copy from a process which does not have a stable address space
+		 * due to VM fiddling with it
+		 */
+		if (RTS_ISSET(src_ptr, RTS_VMINHIBIT)) {
+			src_ptr->p_misc_flags |= MF_SENDA_VM_MISS;
+			continue;
+		}
+#endif
+		return src_ptr;
+	}
+	return NULL;
+}
+
+static struct proc *peek_queue(struct proc *caller_ptr)
+{
+    return caller_ptr->p_caller_q;
+}
+
 static int mini_receive(struct proc * caller_ptr,
 			endpoint_t src_e, /* which message source is wanted */
 			message * m_buff_usr, /* pointer to message buffer */
 			const int flags)
 {
 	int res,src_p;
-	struct proc *src_ptr;
+	struct proc *src_ptr,*next_notif,*next_async,*next_queue;
 
 	src_p = _ENDPOINT_P(src_e);
 	src_ptr = proc_addr(src_p);
 
 	/* If we are receiving from a specific source lock only the caller and
 	 * the source. */
- 	if(src_e == ANY) {
-		BKL_LOCK();
-	} else {
-		/* TODO: When dealing with ANY we need to be a bit more careful.
+ 	if(src_e==ANY) {
+		/* When dealing with ANY we need to be a bit more careful.
 		 * In this case we can deliver the message in 3 ways:
 		 * 	_ A pending notification.
 		 * 	_ A pending async message.
@@ -1199,14 +1250,42 @@ static int mini_receive(struct proc * caller_ptr,
 		 * procs that would be used for each case. Once we have all
 		 * the procs we can lock them.
 		 */
-		lock_two_procs(caller_ptr,src_ptr);
+		lock_proc(caller_ptr);
+retry:
+		next_notif = peek_pending_notif(caller_ptr);
+		next_async = peek_pending_async(caller_ptr);
+		next_queue = peek_queue(caller_ptr);
+
+		/* Unlock the caller and re-acquire all the locks in order. */
+		unlock_proc(caller_ptr);
+		lock_four_procs(caller_ptr,next_notif,next_async,next_queue);
+
+		/* Check that nothing has changed in the meantime. */
+		if(next_notif!=peek_pending_notif(caller_ptr)||
+		   next_async!=peek_pending_async(caller_ptr)||
+		   next_queue!=peek_queue(caller_ptr)) {
+			/* Keep the lock on caller_ptr. */
+			if(next_notif)
+				unlock_proc(next_notif);
+			if(next_async)
+				unlock_proc(next_async);
+			if(next_queue)
+				unlock_proc(next_queue);
+
+			goto retry;
+		}
+
+		/* Nothing has changed while re-acquiring the locks, we can
+		 * call mini_receive_no_lock now. */
+	} else {
+		unlock_two_procs(caller_ptr,src_ptr);
 	}
 
 	res = mini_receive_no_lock(caller_ptr,src_e,m_buff_usr,flags);
 
-	if(src_e==ANY)
-		BKL_UNLOCK();
-	else
+	if(src_e==ANY) {
+		unlock_four_procs(caller_ptr,next_notif,next_async,next_queue);
+	} else
 		unlock_two_procs(caller_ptr,src_ptr);
 
 	return res;
@@ -2216,4 +2295,75 @@ void unlock_two_procs(struct proc *p1,struct proc *p2)
 		unlock_proc(p1);
 		unlock_proc(p2);
 	}
+}
+
+void lock_four_procs(struct proc *p1,struct proc *p2,struct proc *p3,struct proc *p4)
+{
+	struct proc *sorted[4];		/* Will contain the final result. */
+	struct proc *left[2],*right[2];	/* Subsets. */
+	int i,left_i,right_i;
+	struct proc *left_head,*right_head,*last;
+
+	if(p1<p2) {
+		left[0] = p1;
+		left[1] = p2;
+	} else {
+		left[0] = p2;
+		left[1] = p1;
+	}
+
+	if(p3<p4) {
+		right[0] = p3;
+		right[1] = p4;
+	} else {
+		right[0] = p4;
+		right[1] = p3;
+	}
+
+	left_i = 0;
+	right_i = 0;
+	for(i=0;i<4;++i) {
+		if(left_i<2)
+			left_head = left[left_i];
+		if(right_i<2)
+			right_head = right[right_i];
+		if(left_i<2&&right_i<2) {
+			/* Both heads are valid. */
+			if(left_head<right_head) {
+				sorted[i] = left_head;
+				left_i++;
+			} else {
+				sorted[i] = right_head;
+				right_i++;
+			}
+		} else if(left_i<2) {
+			sorted[i] = left_head;
+			left_i++;
+		} else if(right_i<2) {
+			sorted[i] = right_head;
+			right_i++;
+		} else {
+			panic("Sorting failed.");
+		}
+	}
+
+	last = NULL;
+	for(i=0;i<4;++i) {
+		assert(last<=sorted[i]);
+		if(sorted[i])
+			lock_proc(sorted[i]);
+		last = sorted[i];
+	}
+}
+
+void unlock_four_procs(struct proc *p1,struct proc *p2,struct proc *p3,struct proc *p4)
+{
+	if(p1)
+		unlock_proc(p1);
+	if(p2)
+		unlock_proc(p2);
+	if(p3)
+		unlock_proc(p3);
+	if(p4)
+		unlock_proc(p4);
 }

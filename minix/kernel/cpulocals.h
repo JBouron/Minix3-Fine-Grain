@@ -54,6 +54,9 @@ extern struct __cpu_local_vars {
 	int n_receive;
 	int n_receive_any;
 
+	int n_retries_recv;
+	int n_retries_recv_all_null;
+
 /* 
  * signal whether pagefault is already being handled to detect recursive
  * pagefaults
