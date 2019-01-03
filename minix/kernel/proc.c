@@ -1252,6 +1252,8 @@ static int mini_receive(struct proc * caller_ptr,
 		 */
 		lock_proc(caller_ptr);
 retry:
+		// TODO: We need to be very careful here, the next_.* procs
+		// may be duplicates.
 		next_notif = peek_pending_notif(caller_ptr);
 		next_async = peek_pending_async(caller_ptr);
 		next_queue = peek_queue(caller_ptr);
@@ -1265,13 +1267,7 @@ retry:
 		   next_async!=peek_pending_async(caller_ptr)||
 		   next_queue!=peek_queue(caller_ptr)) {
 			/* Keep the lock on caller_ptr. */
-			if(next_notif)
-				unlock_proc(next_notif);
-			if(next_async)
-				unlock_proc(next_async);
-			if(next_queue)
-				unlock_proc(next_queue);
-
+			unlock_three_procs(next_notif,next_async,next_queue);
 			goto retry;
 		}
 
@@ -2297,12 +2293,11 @@ void unlock_two_procs(struct proc *p1,struct proc *p2)
 	}
 }
 
-void lock_four_procs(struct proc *p1,struct proc *p2,struct proc *p3,struct proc *p4)
+static void _sort4(struct proc *sorted[4],struct proc *p1,struct proc *p2,struct proc *p3,struct proc *p4)
 {
-	struct proc *sorted[4];		/* Will contain the final result. */
 	struct proc *left[2],*right[2];	/* Subsets. */
 	int i,left_i,right_i;
-	struct proc *left_head,*right_head,*last;
+	struct proc *left_head,*right_head;
 
 	if(p1<p2) {
 		left[0] = p1;
@@ -2347,23 +2342,41 @@ void lock_four_procs(struct proc *p1,struct proc *p2,struct proc *p3,struct proc
 		}
 	}
 
+}
+
+void lock_four_procs(struct proc *p1,struct proc *p2,struct proc *p3,struct proc *p4)
+{
+	struct proc *sorted[4];
+	int i;
+	struct proc *last;
+
+	_sort4(sorted,p1,p2,p3,p4);
+
 	last = NULL;
 	for(i=0;i<4;++i) {
 		assert(last<=sorted[i]);
-		if(sorted[i])
+		if(sorted[i]&&(i==0||sorted[i-1]!=sorted[i]))
 			lock_proc(sorted[i]);
 		last = sorted[i];
 	}
 }
 
+void unlock_three_procs(struct proc *p1,struct proc *p2,struct proc *p3)
+{
+	unlock_four_procs(p1,p2,p3,NULL);
+}
+
 void unlock_four_procs(struct proc *p1,struct proc *p2,struct proc *p3,struct proc *p4)
 {
-	if(p1)
-		unlock_proc(p1);
-	if(p2)
-		unlock_proc(p2);
-	if(p3)
-		unlock_proc(p3);
-	if(p4)
-		unlock_proc(p4);
+	struct proc *sorted[4];
+	struct proc *last;
+	int i;
+	_sort4(sorted,p1,p2,p3,p4);
+	last = NULL;
+	for(i=0;i<4;++i) {
+		assert(last<=sorted[i]);
+		if(sorted[i]&&(i==0||sorted[i-1]!=sorted[i]))
+			unlock_proc(sorted[i]);
+		last = sorted[i];
+	}
 }
