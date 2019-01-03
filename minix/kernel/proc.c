@@ -937,6 +937,7 @@ int mini_send_no_lock(
 		caller_ptr->p_misc_flags |= MF_SENDING_FROM_KERNEL;
 	}
 
+	assert(!RTS_ISSET(caller_ptr,RTS_SENDING));
 	RTS_SET(caller_ptr, RTS_SENDING);
 	caller_ptr->p_sendto_e = dst_e;
 

@@ -74,7 +74,6 @@ EXTERN int config_no_smp; /* optionally turn off SMP */
 
 /* VM */
 EXTERN int vm_running;
-EXTERN int catch_pagefaults;
 EXTERN int kernel_may_alloc;
 
 /* Variables that are initialized elsewhere are just extern here. */

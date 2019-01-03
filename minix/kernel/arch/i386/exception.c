@@ -44,8 +44,6 @@ static struct ex_s ex_data[] = {
 static void inkernel_disaster(struct proc *saved_proc,
 	struct exception_frame *frame, struct ex_s *ep, int is_nested);
 
-extern int catch_pagefaults;
-
 static void proc_stacktrace_execute(struct proc *whichproc, reg_t v_bp, reg_t pc);
 
 static void pagefault( struct proc *pr,
@@ -72,7 +70,7 @@ static void pagefault( struct proc *pr,
 	   (frame->eip < (vir_bytes) memset_fault);
 
 	if((is_nested || iskernelp(pr)) &&
-		catch_pagefaults && (in_physcopy || in_memset)) {
+		get_cpulocal_var(catch_pagefaults) && (in_physcopy || in_memset)) {
 #if 0
 		printf("pf caught! addr 0x%lx\n", pagefaultcr2);
 #endif

@@ -8,9 +8,9 @@
 #define EFAULT_DST	(-994)
 
 #define PHYS_COPY_CATCH(src, dst, size, a) {	\
-	catch_pagefaults++;			\
+	get_cpulocal_var(catch_pagefaults)++;			\
 	a = phys_copy(src, dst, size);		\
-	catch_pagefaults--;			\
+	get_cpulocal_var(catch_pagefaults)--;			\
 	}
 
 #endif
