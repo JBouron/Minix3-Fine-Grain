@@ -591,6 +591,9 @@ static int do_sync_ipc(struct proc * caller_ptr, /* who made the call */
 	result = EBADCALL;			/* illegal system call */
   }
 
+  /* Just making sure. */
+  assert(result==OK||(EBADCPU<=result&&result<=ERESTART));
+
   /* Now, return the result of the system call to the caller. */
   return(result);
 }
