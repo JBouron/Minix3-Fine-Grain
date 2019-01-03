@@ -8,4 +8,4 @@ else
 	PORT="1234"
 fi
 REMOTE_ADDR="localhost:$PORT"
-gdb -s $KERNEL_IMAGE -ex "target remote $REMOTE_ADDR" -ex "layout $DEFAULT_LAYOUT"
+gdb -s $KERNEL_IMAGE -ex "target remote $REMOTE_ADDR" -ex "layout $DEFAULT_LAYOUT" -ex "info thread"
