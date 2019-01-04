@@ -145,13 +145,7 @@ struct proc {
 #endif
 };
 
-#define lock_proc(p) spinlock_lock(&((p)->p_lock.lock))
-#define unlock_proc(p) spinlock_unlock(&((p)->p_lock.lock))
-
 #endif /* __ASSEMBLY__ */
-
-#define lock_proc(p) spinlock_lock(&((p)->p_lock.lock))
-#define unlock_proc(p) spinlock_unlock(&((p)->p_lock.lock))
 
 
 /* Bits for the runtime flags. A process is runnable iff p_rts_flags == 0. */
@@ -311,6 +305,9 @@ int mini_send(struct proc *caller_ptr, endpoint_t dst_e, message *m_ptr,
 void _rts_set(struct proc *p,int flag);
 void _rts_unset(struct proc *p,int flag);
 void _rts_setflags(struct proc *p,int flag);
+
+void lock_proc(struct proc *p);
+void unlock_proc(struct proc *p);
 
 void lock_two_procs(struct proc *p1,struct proc *p2);
 void unlock_two_procs(struct proc *p1,struct proc *p2);

@@ -2275,13 +2275,34 @@ void _rts_setflags(struct proc *p,int flag)
 	}
 }
 
+void lock_proc(struct proc *p)
+{
+	/* Passing NULL may happens when "prefetching" in mini_receive. */
+	if(!p)
+		return;
+	/* For now we bypass the reentrant locks. */
+	spinlock_lock(&(p->p_lock.lock));
+}
+
+void unlock_proc(struct proc *p)
+{
+	/* Passing NULL may happens when "prefetching" in mini_receive. */
+	if(!p)
+		return;
+	/* For now we bypass the reentrant locks. */
+	spinlock_unlock(&(p->p_lock.lock));
+}
+
 void lock_two_procs(struct proc *p1,struct proc *p2)
 {
 	if(p1<p2) {
 		lock_proc(p1);
 		lock_proc(p2);
-	} else {
+	} else if(p2<p1) {
 		lock_proc(p2);
+		lock_proc(p1);
+	} else {
+		/* p1==p2. */
 		lock_proc(p1);
 	}
 }
@@ -2291,9 +2312,12 @@ void unlock_two_procs(struct proc *p1,struct proc *p2)
 	if(p1<p2) {
 		unlock_proc(p2);
 		unlock_proc(p1);
-	} else {
+	} else if(p2<p1) {
 		unlock_proc(p1);
 		unlock_proc(p2);
+	} else {
+		/* p1==p2. */
+		unlock_proc(p1);
 	}
 }
 
