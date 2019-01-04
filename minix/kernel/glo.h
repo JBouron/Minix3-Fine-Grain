@@ -47,6 +47,9 @@ EXTERN unsigned lost_ticks;	/* clock ticks counted outside clock task */
 EXTERN char *ipc_call_names[IPCNO_HIGHEST+1]; /* human-readable call names */
 
 /* Interrupt related variables. */
+SPINLOCK_DECLARE(irq_lock);			/* Lock for any irq related op. */
+#define lock_irq() spinlock_lock(&irq_lock)
+#define unlock_irq() spinlock_unlock(&irq_lock)
 EXTERN irq_hook_t irq_hooks[NR_IRQ_HOOKS];	/* hooks for general use */
 EXTERN int irq_actids[NR_IRQ_VECTORS];		/* IRQ ID bits active */
 EXTERN int irq_use;				/* map of all in-use irq's */

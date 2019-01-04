@@ -63,13 +63,16 @@ void __gdb_bkl_unlock(spinlock_t *lock, int cpu) {
 
 void bkl_lock(void)
 {
-	BKL_LOCK();
+       BKL_LOCK();
 }
 
 void bkl_unlock(void)
 {
-	BKL_UNLOCK();
+       BKL_UNLOCK();
 }
+
+static int bkl_owner = -1;
+static int bkl_acq_count = 0;
 
 void lock_all_procs(void)
 {
@@ -77,11 +80,14 @@ void lock_all_procs(void)
 	nprocs = sizeof(proc)/sizeof(struct proc);
 	for(p=0;p<nprocs;++p)
 		lock_proc(&(proc[p]));
+	bkl_owner = cpuid;
+	bkl_acq_count++;
 }
 
 void unlock_all_procs(void)
 {
 	int p,nprocs;
+	bkl_owner = -1;
 	nprocs = sizeof(proc)/sizeof(struct proc);
 	for(p=0;p<nprocs;++p)
 		unlock_proc(&(proc[p]));

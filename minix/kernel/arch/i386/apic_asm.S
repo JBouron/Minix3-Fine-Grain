@@ -21,19 +21,15 @@ ENTRY(apic_hwint##irq)							\
 	SAVE_PROCESS_CTX(0, KTS_INT_HARD)				;\
 	push	%ebp							;\
 	call	_C_LABEL(context_stop)					;\
-	call	_C_LABEL(bkl_lock)					;\
 	add	$4, %esp						;\
 	movl	$0, %ebp	/* for stack trace */			;\
 	APIC_IRQ_HANDLER(irq)						;\
-	call	_C_LABEL(bkl_unlock)					;\
 	jmp	_C_LABEL(switch_to_user)				;\
 									\
 0:									\
 	pusha								;\
 	call	_C_LABEL(context_stop_idle)				;\
-	call	_C_LABEL(bkl_lock)					;\
 	APIC_IRQ_HANDLER(irq)						;\
-	call	_C_LABEL(bkl_unlock)					;\
 	CLEAR_IF(10*4(%esp))						;\
 	popa								;\
 	iret								;
@@ -54,19 +50,15 @@ ENTRY(apic_hwint##irq)							\
 	SAVE_PROCESS_CTX(0, KTS_INT_HARD)				;\
 	push	%ebp							;\
 	call	_C_LABEL(context_stop)					;\
-	call	_C_LABEL(bkl_lock)					;\
 	add	$4, %esp						;\
 	movl	$0, %ebp		/* for stack trace */		;\
 	LAPIC_INTR_HANDLER(func)					;\
-	call	_C_LABEL(bkl_unlock)					;\
 	jmp	_C_LABEL(switch_to_user)				;\
 	\
 0:	\
 	pusha								;\
 	call	_C_LABEL(context_stop_idle)				;\
-	call	_C_LABEL(bkl_lock)					;\
 	LAPIC_INTR_HANDLER(func)					;\
-	call	_C_LABEL(bkl_unlock)					;\
 	CLEAR_IF(10*4(%esp))						;\
 	popa								;\
 	iret								;

@@ -177,6 +177,7 @@ void system_init(void)
 
   /* Initialize IRQ handler hooks. Mark all hooks available. */
   for (i=0; i<NR_IRQ_HOOKS; i++) {
+      // We are running on the BSP, forget about the lock.
       irq_hooks[i].proc_nr_e = NONE;
   }
 

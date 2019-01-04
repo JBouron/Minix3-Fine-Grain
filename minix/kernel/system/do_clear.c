@@ -38,12 +38,14 @@ int do_clear(struct proc * caller, message * m_ptr)
   if(isemptyp(rc)) return OK;
 
   /* Check the table with IRQ hooks to see if hooks should be released. */
+  lock_irq();
   for (i=0; i < NR_IRQ_HOOKS; i++) {
       if (rc->p_endpoint == irq_hooks[i].proc_nr_e) {
-        rm_irq_handler(&irq_hooks[i]);	/* remove interrupt handler */
+        rm_irq_handler_no_lock(&irq_hooks[i]);	/* remove interrupt handler */
         irq_hooks[i].proc_nr_e = NONE;	/* mark hook as free */
       } 
   }
+  unlock_irq();
 
   /* Remove the process' ability to send and receive messages */
   clear_endpoint(rc);

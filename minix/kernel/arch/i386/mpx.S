@@ -78,10 +78,8 @@ IMPORT(multiboot_init)
 	push	%ebp							;\
 	movl	$0, %ebp	/* for stack trace */			;\
 	call	_C_LABEL(context_stop)					;\
-	call	_C_LABEL(bkl_lock)					;\
 	add	$4, %esp						;\
 	PIC_IRQ_HANDLER(irq)						;\
-	call	_C_LABEL(bkl_unlock)					;\
 	movb	$END_OF_INT, %al					;\
 	outb	$INT_CTL	/* reenable interrupts in master pic */	;\
 	jmp	_C_LABEL(switch_to_user)				;\
@@ -89,9 +87,7 @@ IMPORT(multiboot_init)
 0:									\
 	pusha								;\
 	call	_C_LABEL(context_stop_idle)				;\
-	call	_C_LABEL(bkl_lock)					;\
 	PIC_IRQ_HANDLER(irq)						;\
-	call	_C_LABEL(bkl_unlock)					;\
 	movb	$END_OF_INT, %al					;\
 	outb	$INT_CTL	/* reenable interrupts in master pic */	;\
 	CLEAR_IF(10*4(%esp))						;\
@@ -142,10 +138,8 @@ ENTRY(hwint07)
 	push	%ebp							;\
 	movl	$0, %ebp	/* for stack trace */			;\
 	call	_C_LABEL(context_stop)					;\
-	call	_C_LABEL(bkl_lock)					;\
 	add	$4, %esp						;\
 	PIC_IRQ_HANDLER(irq)						;\
-	call	_C_LABEL(bkl_unlock)					;\
 	movb	$END_OF_INT, %al					;\
 	outb	$INT_CTL	/* reenable interrupts in master pic */	;\
 	outb	$INT2_CTL	/* reenable slave 8259		  */	;\
@@ -154,9 +148,7 @@ ENTRY(hwint07)
 0:									\
 	pusha								;\
 	call	_C_LABEL(context_stop_idle)				;\
-	call	_C_LABEL(bkl_lock)					;\
 	PIC_IRQ_HANDLER(irq)						;\
-	call	_C_LABEL(bkl_unlock)					;\
 	movb	$END_OF_INT, %al					;\
 	outb	$INT_CTL	/* reenable interrupts in master pic */	;\
 	outb	$INT2_CTL	/* reenable slave 8259		  */	;\

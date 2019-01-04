@@ -78,6 +78,8 @@ int timer_int_handler(void)
 
 	struct proc * p, * billp;
 
+	BKL_LOCK();
+
 	/* FIXME watchdog for slave cpus! */
 #ifdef USE_WATCHDOG
 	/*
@@ -169,6 +171,7 @@ int timer_int_handler(void)
 
 	arch_timer_int_handler();
 
+	BKL_UNLOCK();
 	return(1);					/* reenable interrupts */
 }
 

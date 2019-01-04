@@ -126,9 +126,13 @@ void vtimer_check(struct proc *rp);
 
 /* interrupt.c */
 void put_irq_handler(irq_hook_t *hook, int irq, irq_handler_t handler);
+void put_irq_handler_no_lock(irq_hook_t *hook, int irq, irq_handler_t handler);
 void rm_irq_handler(const irq_hook_t *hook);
+void rm_irq_handler_no_lock(const irq_hook_t *hook);
 void enable_irq(const irq_hook_t *hook);
+void enable_irq_no_lock(const irq_hook_t *hook);
 int disable_irq(const irq_hook_t *hook);
+int disable_irq_no_lock(const irq_hook_t *hook);
 
 void interrupts_enable(void);
 void interrupts_disable(void);

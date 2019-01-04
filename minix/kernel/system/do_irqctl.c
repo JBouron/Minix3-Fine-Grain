@@ -20,7 +20,7 @@ static int generic_handler(irq_hook_t *hook);
 /*===========================================================================*
  *				do_irqctl				     *
  *===========================================================================*/
-int do_irqctl(struct proc * caller, message * m_ptr)
+static int do_irqctl_no_lock(struct proc * caller, message * m_ptr)
 {
   /* Dismember the request message. */
   int irq_vec;
@@ -45,10 +45,10 @@ int do_irqctl(struct proc * caller, message * m_ptr)
           irq_hooks[irq_hook_id].proc_nr_e == NONE) return(EINVAL);
       if (irq_hooks[irq_hook_id].proc_nr_e != caller->p_endpoint) return(EPERM);
       if (m_ptr->m_lsys_krn_sys_irqctl.request == IRQ_ENABLE) {
-          enable_irq(&irq_hooks[irq_hook_id]);	
+          enable_irq_no_lock(&irq_hooks[irq_hook_id]);	
       }
       else 
-          disable_irq(&irq_hooks[irq_hook_id]);	
+          disable_irq_no_lock(&irq_hooks[irq_hook_id]);	
       break;
 
   /* Control IRQ policies. Set a policy and needed details in the IRQ table.
@@ -94,7 +94,7 @@ int do_irqctl(struct proc * caller, message * m_ptr)
               && irq_hooks[i].notify_id == notify_id) {
               irq_hook_id = i;
               hook_ptr = &irq_hooks[irq_hook_id];	/* existing hook */
-              rm_irq_handler(&irq_hooks[irq_hook_id]);
+              rm_irq_handler_no_lock(&irq_hooks[irq_hook_id]);
           }
       }
 
@@ -111,7 +111,7 @@ int do_irqctl(struct proc * caller, message * m_ptr)
       hook_ptr->proc_nr_e = caller->p_endpoint;	/* process to notify */
       hook_ptr->notify_id = notify_id;		/* identifier to pass */   	
       hook_ptr->policy = m_ptr->m_lsys_krn_sys_irqctl.policy;	/* policy for interrupts */
-      put_irq_handler(hook_ptr, irq_vec, generic_handler);
+      put_irq_handler_no_lock(hook_ptr, irq_vec, generic_handler);
       DEBUGBASIC(("IRQ %d handler registered by %s / %d\n",
 			      irq_vec, caller->p_name, caller->p_endpoint));
 
@@ -127,7 +127,7 @@ int do_irqctl(struct proc * caller, message * m_ptr)
            return(EPERM);
       }
       /* Remove the handler and return. */
-      rm_irq_handler(&irq_hooks[irq_hook_id]);
+      rm_irq_handler_no_lock(&irq_hooks[irq_hook_id]);
       irq_hooks[irq_hook_id].proc_nr_e = NONE;
       break;
 
@@ -135,6 +135,15 @@ int do_irqctl(struct proc * caller, message * m_ptr)
       r = EINVAL;				/* invalid IRQ REQUEST */
   }
   return(r);
+}
+
+int do_irqctl(struct proc * caller, message * m_ptr)
+{
+	int res;
+	lock_irq();
+	res = do_irqctl_no_lock(caller,m_ptr);
+	unlock_irq();
+	return res;
 }
 
 /*===========================================================================*
@@ -167,7 +176,10 @@ static int generic_handler(irq_hook_t * hook)
   priv(proc_addr(proc_nr))->s_int_pending |= (1 << hook->notify_id);
 
   /* Build notification message and return. */
-  mini_notify_no_lock(proc_addr(HARDWARE), hook->proc_nr_e);
+
+  /* Call the lock version since we don't have the BKL anymore when handling
+   * irqs. */
+  mini_notify(proc_addr(HARDWARE), hook->proc_nr_e);
   return(hook->policy & IRQ_REENABLE);
 }
 

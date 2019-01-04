@@ -89,6 +89,7 @@ int do_getinfo(struct proc * caller, message * m_ptr)
         break;
     }
     case GET_IRQHOOKS: {
+	// No need for the irq lock here.
         length = sizeof(struct irq_hook) * NR_IRQ_HOOKS;
         src_vir = (vir_bytes) irq_hooks;
         break;
@@ -177,6 +178,7 @@ int do_getinfo(struct proc * caller, message * m_ptr)
     	break;
     }
     case GET_IRQACTIDS: {
+	// We don't really need the irq lock here.
         length = sizeof(irq_actids);
         src_vir = (vir_bytes) irq_actids;
         break;
