@@ -80,12 +80,16 @@ void unlock_all_procs(void);
 /* To lock/unlock the BKL from asm: */
 void bkl_lock(void);
 void bkl_unlock(void);
+extern int bkl_line;
+extern char *bkl_file;
 
 #define BKL_LOCK() \
 	do { \
 		ktzprofile_event(KTRACE_BKL_TRY); \
 		lock_all_procs(); \
 		ktzprofile_event(KTRACE_BKL_ACQUIRE); \
+		bkl_line = __LINE__; \
+		bkl_file = __FILE__; \
 		__gdb_bkl_lock(&big_kernel_lock, cpuid); \
 	} while (0)
 

@@ -32,7 +32,7 @@ int do_kill(struct proc * caller, message * m_ptr)
   if (iskerneln(proc_nr)) return(EPERM);
 
   /* Set pending signal to be processed by the signal manager. */
-  cause_sig(proc_nr, sig_nr);
+  cause_sig_deferred(proc_nr, sig_nr);
 
   return(OK);
 }

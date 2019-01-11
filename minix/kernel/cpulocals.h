@@ -36,6 +36,15 @@
 #define unlock_runqueues(cpu)
 #endif
 
+#define SIGBUFFER_SIZE (NR_SYS_PROCS) /* send_diag_sig sends NR_SYS_PROCS signals */
+#define SIGBUFFER_OP_CAUSE_SIG	0x1
+#define SIGBUFFER_OP_SEND_SIG	0x2
+struct sigbuffer_entry {
+	int proc_nr_endpt;	/* The proc_nr or endpoint. */
+	int sig_nr;		/* The signal number. */
+	int op;			/* cause_sig or send_sig ? */
+};
+
 /*
  * The global cpu local variables in use
  */
@@ -58,6 +67,11 @@ extern struct __cpu_local_vars {
 	int n_retries_recv_all_null;
 
 	int catch_pagefaults;
+
+	/* All the signals that this cpu should send before exiting the kernel
+	 * or going idle. */
+	struct sigbuffer_entry sigbuffer[SIGBUFFER_SIZE];
+	int sigbuffer_count;	/* The number of entries in the sigbuffer. */
 
 /* 
  * signal whether pagefault is already being handled to detect recursive

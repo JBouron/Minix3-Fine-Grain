@@ -86,7 +86,7 @@ static void kernel_call_finish(struct proc * caller, message *msg, int result)
 					  caller->p_delivermsg_vir,
 					  caller->p_name,
 					  caller->p_endpoint);
-			  cause_sig(proc_nr(caller), SIGSEGV);
+			  cause_sig_deferred(proc_nr(caller), SIGSEGV);
 		  }
 	  }
   }
@@ -154,7 +154,7 @@ void kernel_call(message *m_user, struct proc * caller)
   else {
 	  printf("WARNING wrong user pointer 0x%08x from process %s / %d\n",
 			  m_user, caller->p_name, caller->p_endpoint);
-	  cause_sig(proc_nr(caller), SIGSEGV);
+	  cause_sig_deferred(proc_nr(caller), SIGSEGV);
 	  BKL_UNLOCK();
 	  return;
   }
@@ -364,10 +364,31 @@ void fill_sendto_mask(const struct proc *rp, sys_map_t *map)
   }
 }
 
+static void schedule_sig(int proc_nr_ep,int sig_nr,int op)
+{
+	/* Schedule a signal to be send once we reach switch_to_user. */
+	int cpu;
+	struct sigbuffer_entry *entry;
+	/* Simply add the sig in the sigbuffer. */
+	cpu = cpuid;
+	/* Use get_cpu_var to reduce the number of cpuid calls. */
+
+	entry = &(get_cpu_var(cpu,sigbuffer)[get_cpu_var(cpu,sigbuffer_count)]);
+	get_cpu_var(cpu,sigbuffer_count)++;
+
+	/* We don't expect to send more that SIGBUFFER_SIZE deferred signals. */
+	assert(get_cpu_var(cpu,sigbuffer_count)<=SIGBUFFER_SIZE);
+
+	/* Update the entry in the sigbuffer. */
+	entry->proc_nr_endpt = proc_nr_ep;
+	entry->sig_nr = sig_nr;
+	entry->op = op;
+}
+
 /*===========================================================================*
  *				send_sig				     *
  *===========================================================================*/
-int send_sig(endpoint_t ep, int sig_nr)
+int send_sig_actual(endpoint_t ep, int sig_nr)
 {
 /* Notify a system process about a signal. This is straightforward. Simply
  * set the signal that is to be delivered in the pending signals map and
@@ -375,24 +396,45 @@ int send_sig(endpoint_t ep, int sig_nr)
  */
   register struct proc *rp;
   struct priv *priv;
-  int proc_nr;
+  int proc_nr,res;
 
   if(!isokendpt(ep, &proc_nr) || isemptyn(proc_nr))
 	return EINVAL;
 
   rp = proc_addr(proc_nr);
-  priv = priv(rp);
-  if(!priv) return ENOENT;
-  sigaddset(&priv->s_sig_pending, sig_nr);
-  mini_notify_no_lock(proc_addr(SYSTEM), rp->p_endpoint);
 
-  return OK;
+  lock_proc(rp);
+
+  priv = priv(rp);
+  if(!priv) {
+	  res = ENOENT;
+	  panic("send_sig_actual failed.");
+  } else {
+	  sigaddset(&priv->s_sig_pending, sig_nr);
+	  /* Here's the trick, we don't really need the lock on SYSTEM here,
+	   * because mini_notify won't change anything in the caller's struct.
+	   * Thus call the no_lock version. */
+	  mini_notify_no_lock(proc_addr(SYSTEM), rp->p_endpoint);
+	  res = OK;
+  }
+
+  unlock_proc(rp);
+  return res;
+}
+
+int send_sig_deferred(endpoint_t ep, int sig_nr)
+{
+	schedule_sig(ep,sig_nr,SIGBUFFER_OP_SEND_SIG);
+	/* The original send_sig error either was ignored or led to a panic.
+	 * Thus always return OK in the deferred version. The actual version
+	 * will panic */
+	return OK;
 }
 
 /*===========================================================================*
  *				cause_sig				     *
  *===========================================================================*/
-void cause_sig(proc_nr_t proc_nr, int sig_nr)
+void cause_sig_actual(proc_nr_t proc_nr, int sig_nr)
 {
 /* A system process wants to send signal 'sig_nr' to process 'proc_nr'.
  * Examples are:
@@ -424,11 +466,17 @@ void cause_sig(proc_nr_t proc_nr, int sig_nr)
            /* If the signal is lethal, see if a backup signal manager exists. */
            sig_mgr = priv(rp)->s_bak_sig_mgr;
            if(sig_mgr != NONE && isokendpt(sig_mgr, &sig_mgr_proc_nr)) {
+               sig_mgr_rp = proc_addr(sig_mgr_proc_nr);
+
+	       lock_two_procs(rp,sig_mgr_rp);
+
                priv(rp)->s_sig_mgr = sig_mgr;
                priv(rp)->s_bak_sig_mgr = NONE;
-               sig_mgr_rp = proc_addr(sig_mgr_proc_nr);
                RTS_UNSET(sig_mgr_rp, RTS_NO_PRIV);
-               cause_sig(proc_nr, sig_nr); /* try again with the new sig mgr. */
+
+	       unlock_two_procs(rp,sig_mgr_rp);
+
+               cause_sig_actual(proc_nr, sig_nr); /* try again with the new sig mgr. */
                return;
            }
            /* We are out of luck. Time to panic. */
@@ -436,22 +484,65 @@ void cause_sig(proc_nr_t proc_nr, int sig_nr)
            panic("cause_sig: sig manager %d gets lethal signal %d for itself",
 	   	rp->p_endpoint, sig_nr);
        }
+
+       lock_proc(rp);
        sigaddset(&priv(rp)->s_sig_pending, sig_nr);
-       if(OK != send_sig(rp->p_endpoint, SIGKSIGSM))
+       unlock_proc(rp);
+
+       if(OK != send_sig_actual(rp->p_endpoint, SIGKSIGSM))
        	panic("send_sig failed");
        return;
   }
 
+  lock_proc(rp);
   s = sigismember(&rp->p_pending, sig_nr);
   /* Check if the signal is already pending. Process it otherwise. */
   if (!s) {
       sigaddset(&rp->p_pending, sig_nr);
       if (! (RTS_ISSET(rp, RTS_SIGNALED))) {		/* other pending */
 	  RTS_SET(rp, RTS_SIGNALED | RTS_SIG_PENDING);
-          if(OK != send_sig(sig_mgr, SIGKSIG))
+	  unlock_proc(rp);
+          if(OK != send_sig_actual(sig_mgr, SIGKSIG))
 	  	panic("send_sig failed");
-      }
-  }
+      } else
+	      unlock_proc(rp);
+  } else
+	  unlock_proc(rp);
+}
+
+void cause_sig_deferred(proc_nr_t proc_nr, int sig_nr)
+{
+	schedule_sig(proc_nr,sig_nr,SIGBUFFER_OP_CAUSE_SIG);
+}
+
+void handle_all_deferred_sigs(void)
+{
+	/* Actually send the signals now. */
+	int cpu,nsigs,i;
+	struct sigbuffer_entry *entry;
+
+	cpu = cpuid;
+	nsigs = get_cpu_var(cpu,sigbuffer_count);
+	for(i=0;i<nsigs;++i) {
+		entry = &(get_cpu_var(cpu,sigbuffer)[i]);
+		switch (entry->op) {
+		case SIGBUFFER_OP_CAUSE_SIG:
+			cause_sig_actual(entry->proc_nr_endpt,entry->sig_nr);
+			break;
+		case SIGBUFFER_OP_SEND_SIG:
+			send_sig_actual(entry->proc_nr_endpt,entry->sig_nr);
+			break;
+		default:
+			panic("Invalid op in sigbuffer entry.");
+		}
+		/* Reset the entry. */
+		entry->proc_nr_endpt = 0;
+		entry->sig_nr = 0;
+		entry->op = 0;
+	}
+
+	/* Reset the sigbuffer count. */
+	get_cpu_var(cpu,sigbuffer_count) = 0;
 }
 
 /*===========================================================================*
@@ -466,7 +557,9 @@ void sig_delay_done(struct proc *rp)
 
   rp->p_misc_flags &= ~MF_SIG_DELAY;
 
-  cause_sig(proc_nr(rp), SIGSNDELAY);
+  /* This function is only called in mini_receive, thus use the deferred version
+   * of cause_sig. */
+  cause_sig_deferred(proc_nr(rp), SIGSNDELAY);
 }
 
 /*===========================================================================*
@@ -483,7 +576,7 @@ void send_diag_sig(void)
   for (privp = BEG_PRIV_ADDR; privp < END_PRIV_ADDR; privp++) {
 	if (privp->s_proc_nr != NONE && privp->s_diag_sig == TRUE) {
 		ep = proc_addr(privp->s_proc_nr)->p_endpoint;
-		send_sig(ep, SIGKMESS);
+		send_sig_deferred(ep, SIGKMESS);
 	}
   }
 }
@@ -773,7 +866,7 @@ void clear_ipc_filters(struct proc *rp)
 	 * there are "new" requests pending.
 	 */
 	if (rp->p_endpoint == VM_PROC_NR && vmrequest != NULL)
-		if (send_sig(VM_PROC_NR, SIGKMEM) != OK)
+		if (send_sig_deferred(VM_PROC_NR, SIGKMEM) != OK)
 			panic("send_sig failed");
 }
 

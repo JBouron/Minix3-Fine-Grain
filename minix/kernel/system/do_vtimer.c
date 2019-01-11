@@ -91,13 +91,13 @@ void vtimer_check(struct proc * rp)
   if ((rp->p_misc_flags & MF_VIRT_TIMER) && rp->p_virt_left == 0) {
       rp->p_misc_flags &= ~MF_VIRT_TIMER;
       rp->p_virt_left = 0;
-      cause_sig(rp->p_nr, SIGVTALRM);
+      cause_sig_deferred(rp->p_nr, SIGVTALRM);
   }
 
   /* Check if the profile timer expired. If so, send a SIGPROF signal. */
   if ((rp->p_misc_flags & MF_PROF_TIMER) && rp->p_prof_left == 0) {
       rp->p_misc_flags &= ~MF_PROF_TIMER;
       rp->p_prof_left = 0;
-      cause_sig(rp->p_nr, SIGPROF);
+      cause_sig_deferred(rp->p_nr, SIGPROF);
   }
 }

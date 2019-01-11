@@ -73,6 +73,8 @@ void bkl_unlock(void)
 
 static int bkl_owner = -1;
 static int bkl_acq_count = 0;
+int bkl_line = 0;
+char *bkl_file = NULL;
 
 void lock_all_procs(void)
 {

@@ -274,7 +274,7 @@ void exception_handler(int is_nested, struct exception_frame * frame)
 	}
 
 #endif
-	cause_sig(proc_nr(saved_proc), ep->signum);
+	cause_sig_deferred(proc_nr(saved_proc), ep->signum);
 	return;
   }
 

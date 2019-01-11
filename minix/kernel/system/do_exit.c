@@ -18,7 +18,7 @@ int do_exit(struct proc * caller, message * m_ptr)
  */
   int sig_nr = SIGABRT;
 
-  cause_sig(caller->p_nr, sig_nr);      /* send a signal to the caller */
+  cause_sig_deferred(caller->p_nr, sig_nr);      /* send a signal to the caller */
 
   return(EDONTREPLY);			/* don't reply */
 }

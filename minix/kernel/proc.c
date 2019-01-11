@@ -269,7 +269,7 @@ void vm_suspend(struct proc *caller, const struct proc *target,
 
         /* Connect caller on vmrequest wait queue. */
         if(!(caller->p_vmrequest.nextrequestor = vmrequest))
-                if(OK != send_sig(VM_PROC_NR, SIGKMEM))
+                if(OK != send_sig_deferred(VM_PROC_NR, SIGKMEM))
                         panic("send_sig failed");
         vmrequest = caller;
 }
@@ -292,7 +292,7 @@ static void delivermsg(struct proc *rp)
                                 rp->p_delivermsg_vir,
                                 rp->p_name,
                                 rp->p_endpoint);
-                        cause_sig(rp->p_nr, SIGSEGV);
+                        cause_sig_deferred(rp->p_nr, SIGSEGV);
                 } else {
                         /* 1st failure means we have to ask VM to handle it */
                         vm_suspend(rp, rp, rp->p_delivermsg_vir,
@@ -324,6 +324,9 @@ void switch_to_user(void)
 	int tlb_must_refresh = 0;
 #endif
 
+	/* Send all the signals from the kernel operation we just performed. */
+	handle_all_deferred_sigs();
+
 	p = get_cpulocal_var(proc_ptr);
 
 	/*
@@ -338,6 +341,11 @@ void switch_to_user(void)
 	 * current process wasn't runnable, we pick a new one here
 	 */
 not_runnable_pick_new:
+	/* If we end up here after a resumed kernel call or a delivermsg,
+	 * handle the signals if any. We need to do this before the potential
+	 * enqueue below, because the proc_ptr is set to `p` at this point. */
+	handle_all_deferred_sigs();
+
 	if (proc_is_preempted(p)) {
 		p->p_rts_flags &= ~RTS_PREEMPTED;
 		if (proc_is_runnable(p)) {
@@ -362,6 +370,9 @@ not_runnable_pick_new:
 		get_cpulocal_var(cpu_is_idle) = 1;
 		unlock_runqueues(cpuid);
 		idle();
+		/* We might have scheduled some signal when waking up from the
+		 * halt. handle them now. */
+		handle_all_deferred_sigs();
 		lock_runqueues(cpuid);
 	}
 	unlock_runqueues(cpuid);
@@ -385,9 +396,16 @@ check_misc_flags:
 	}
 
 	assert(proc_is_runnable(p));
-	while (p->p_misc_flags &
-		(MF_KCALL_RESUME | MF_DELIVERMSG |
-		 MF_SC_DEFER | MF_SC_TRACE | MF_SC_ACTIVE)) {
+
+	/* The tracing capabilities have been disabled to break the BKL more
+	 * easily. It shouldn't be a problem for our kind of workloads.
+	 * Nonetheless we don't want to have silent errors, and a future
+	 * work would be to enable those again. */
+	assert(!(p->p_misc_flags&MF_SC_DEFER));
+	assert(!(p->p_misc_flags&MF_SC_TRACE));
+	assert(!(p->p_misc_flags&MF_SC_ACTIVE));
+
+	while (p->p_misc_flags & (MF_KCALL_RESUME | MF_DELIVERMSG)) {
 
 		assert(proc_is_runnable(p));
 		if (p->p_misc_flags & MF_KCALL_RESUME) {
@@ -397,15 +415,6 @@ check_misc_flags:
 			TRACE(VF_SCHEDULING, printf("delivering to %s / %d\n",
 				p->p_name, p->p_endpoint););
 			delivermsg(p);
-		}
-		else if (p->p_misc_flags & MF_SC_DEFER) {
-			panic("NOT IMPLEMENTED");
-		}
-		else if (p->p_misc_flags & MF_SC_TRACE) {
-			panic("NOT IMPLEMENTED");
-		}
-		else if (p->p_misc_flags & MF_SC_ACTIVE) {
-			panic("NOT IMPLEMENTED");
 		}
 
 		/*
@@ -417,6 +426,7 @@ check_misc_flags:
 			goto not_runnable_pick_new;
 		}
 	}
+
 	/*
 	 * check the quantum left before it runs again. We must do it only here
 	 * as we are sure that a possible out-of-quantum message to the
@@ -432,6 +442,13 @@ check_misc_flags:
 		BKL_UNLOCK();
 		goto not_runnable_pick_new;
 	}
+	BKL_UNLOCK();
+
+	/* Check one last time. */
+	handle_all_deferred_sigs();
+	if (!proc_is_runnable(p)) {
+		goto not_runnable_pick_new;
+	}
 
 	TRACE(VF_SCHEDULING, printf("cpu %d starting %s / %d "
 				"pc 0x%08x\n",
@@ -443,7 +460,6 @@ check_misc_flags:
 	p = arch_finish_switch_to_user();
 	assert(p->p_cpu_time_left);
 
-	BKL_UNLOCK();
 	context_stop(proc_addr(KERNEL));
 
 	/* If the process isn't the owner of FPU, enable the FPU exception */
@@ -474,6 +490,9 @@ check_misc_flags:
 
 	/* We are definitely going to user space now. Notify the profiler. */
 	ktzprofile_event(KTRACE_USER_START);
+
+	/* Check that we did not forget to send a signal. */
+	assert(get_cpulocal_var(sigbuffer_count)==0);
 	
 	/*
 	 * restore_user_context() carries out the actual mode switch from kernel
@@ -2198,7 +2217,7 @@ void copr_not_available_handler(void)
 		 * fault. Send a signal, and schedule another process instead.
 		 */
 		*local_fpu_owner = NULL;		/* release FPU */
-		cause_sig(proc_nr(p), SIGFPE);
+		cause_sig_deferred(proc_nr(p), SIGFPE);
 		return;
 	}
 

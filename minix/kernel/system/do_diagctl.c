@@ -53,7 +53,7 @@ int do_diagctl(struct proc * caller, message * m_ptr)
 	 * immediately. After bootup the log is basically never empty.
 	 */
 	if (kmess.km_size > 0 && !kinfo.do_serial_debug)
-		send_sig(caller->p_endpoint, SIGKMESS);
+		send_sig_deferred(caller->p_endpoint, SIGKMESS);
 	return OK;
     case DIAGCTL_CODE_UNREGISTER:
 	if (!(priv(caller)->s_flags & SYS_PROC))
