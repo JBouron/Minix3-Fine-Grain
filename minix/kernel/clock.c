@@ -35,6 +35,9 @@ static void load_update(void);
  * When a timer expires its watchdog function is run by the CLOCK task.
  */
 static minix_timer_t *clock_timers;	/* queue of CLOCK timers */
+static spinlock_t clock_timers_lock;	/* To protect the queue of timers. */
+#define lock_clock_timers() spinlock_lock(&(clock_timers_lock))
+#define unlock_clock_timers() spinlock_unlock(&(clock_timers_lock))
 
 /* Number of ticks to adjust realtime by. A negative value implies slowing
  * down realtime, a positive value implies speeding it up.
@@ -63,6 +66,40 @@ init_clock(void)
 	memset(&kloadinfo, 0, sizeof(kloadinfo));
 }
 
+static void clock_timers_exp(clock_t now)
+{
+	/* Handle the expiration of clock_timers. Release the clock_timers_lock
+	 */
+	int nexp = 0;	/* How many expirations should we save ? */
+	minix_timer_t *tp = clock_timers;
+
+	while ( tp!=NULL && tmr_has_expired(tp, now)) {
+		nexp ++;
+		tp = tp->tmr_next;
+	}
+
+	int idx = 0;
+	endpoint_t exps[nexp]; /* All the endpoint that need to recieve the
+				  signal from CLOCK. */
+
+	minix_timer_t **t = &clock_timers;
+	while ((tp = *t) != NULL && tmr_has_expired(tp, now)) {
+		*t = tp->tmr_next;
+		assert(tp->tmr_func==cause_alarm);
+		tp->tmr_func = NULL;
+		exps[idx++] = tp->tmr_arg;
+	}
+
+	/* We now have all the endpoints that need a notify, release the timer
+	 * lock and send all the notifs. */
+	unlock_clock_timers();
+
+	int i;
+	for(i=0;i<nexp;++i) {
+		cause_alarm(exps[i]);
+	}
+}
+
 /*
  * The boot processor's timer interrupt handler. In addition to non-boot cpus
  * it keeps real time and notifies the clock task if need be.
@@ -77,8 +114,6 @@ int timer_int_handler(void)
 	 */
 
 	struct proc * p, * billp;
-
-	BKL_LOCK();
 
 	/* FIXME watchdog for slave cpus! */
 #ifdef USE_WATCHDOG
@@ -115,6 +150,8 @@ int timer_int_handler(void)
 	p = get_cpulocal_var(proc_ptr);
 	billp = get_cpulocal_var(bill_ptr);
 
+	lock_two_procs(p,billp);
+
 	p->p_user_time++;
 
 	if (! (priv(p)->s_flags & BILLABLE)) {
@@ -149,6 +186,8 @@ int timer_int_handler(void)
 	if (p != billp)
 		vtimer_check(billp);
 
+	unlock_two_procs(p,billp);
+
 	/* Update load average. */
 	load_update();
 
@@ -158,9 +197,14 @@ int timer_int_handler(void)
 		 * that clock tick values may overflow, so we must only look at
 		 * relative differences, and only if there are timers at all.
 		 */
+		lock_clock_timers();
 		if (clock_timers != NULL &&
-		    tmr_has_expired(clock_timers, kclockinfo.uptime))
-			tmrs_exptimers(&clock_timers, kclockinfo.uptime, NULL);
+		    tmr_has_expired(clock_timers, kclockinfo.uptime)) {
+			clock_timers_exp(kclockinfo.uptime);
+			/* The timer lock is released by clock_timers_exp. */
+		} else {
+			unlock_clock_timers();
+		}
 
 #ifdef DEBUG_SERIAL
 		if (kinfo.do_serial_debug)
@@ -169,9 +213,8 @@ int timer_int_handler(void)
 
 	}
 
-	arch_timer_int_handler();
+	arch_timer_int_handler();	/* No-op in i386. */
 
-	BKL_UNLOCK();
 	return(1);					/* reenable interrupts */
 }
 
@@ -239,7 +282,9 @@ void set_kernel_timer(
 /* Insert the new timer in the active timers list. Always update the
  * next timeout time by setting it to the front of the active list.
  */
+  lock_clock_timers();
   (void)tmrs_settimer(&clock_timers, tp, exp_time, watchdog, arg, NULL, NULL);
+  unlock_clock_timers();
 }
 
 /*===========================================================================*
@@ -253,8 +298,11 @@ void reset_kernel_timer(
  * active and expired lists. Always update the next timeout time by setting
  * it to the front of the active list.
  */
-  if (tmr_is_set(tp))
+  if (tmr_is_set(tp)) {
+	lock_clock_timers();
 	(void)tmrs_clrtimer(&clock_timers, tp, NULL, NULL);
+	unlock_clock_timers();
+  }
 }
 
 /*===========================================================================*
@@ -313,3 +361,17 @@ int app_cpu_init_timer(unsigned freq)
 
 	return 0;
 }
+
+/*===========================================================================*
+ *				cause_alarm				     *
+ *===========================================================================*/
+void cause_alarm(int proc_nr_e)
+{
+/* Routine called if a timer goes off and the process requested a synchronous
+ * alarm. The process number is stored as the timer argument. Notify that
+ * process with a notification message from CLOCK.
+ */
+
+  mini_notify(proc_addr(CLOCK), proc_nr_e);	/* notify process */
+}
+

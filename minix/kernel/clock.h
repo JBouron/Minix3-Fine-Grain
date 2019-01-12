@@ -19,4 +19,6 @@ int register_local_timer_handler(irq_handler_t handler);
 u64_t ms_2_cpu_time(unsigned ms);
 unsigned cpu_time_2_ms(u64_t cpu_time);
 
+void cause_alarm(int proc_nr_e);
+
 #endif /* __CLOCK_H__ */

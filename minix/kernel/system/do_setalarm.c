@@ -8,13 +8,12 @@
  */
 
 #include "kernel/system.h"
+#include "kernel/clock.h"
 
 #include <minix/endpoint.h>
 #include <assert.h>
 
 #if USE_SETALARM
-
-static void cause_alarm(int proc_nr_e);
 
 /*===========================================================================*
  *				do_setalarm				     *
@@ -62,17 +61,4 @@ int do_setalarm(struct proc * caller, message * m_ptr)
   }
   return(OK);
 }
-
-/*===========================================================================*
- *				cause_alarm				     *
- *===========================================================================*/
-static void cause_alarm(int proc_nr_e)
-{
-/* Routine called if a timer goes off and the process requested a synchronous
- * alarm. The process number is stored as the timer argument. Notify that
- * process with a notification message from CLOCK.
- */
-  mini_notify_no_lock(proc_addr(CLOCK), proc_nr_e);	/* notify process */
-}
-
 #endif /* USE_SETALARM */
