@@ -893,6 +893,9 @@ int mini_send_no_lock(
   dst_p = _ENDPOINT_P(dst_e);
   dst_ptr = proc_addr(dst_p);
 
+  assert(proc_locked(caller_ptr));
+  assert(proc_locked(dst_ptr));
+
   if (RTS_ISSET(dst_ptr, RTS_NO_ENDPOINT))
   {
 	return EDEADSRCDST;
@@ -1001,6 +1004,7 @@ static int mini_sendrec_no_lock(struct proc *caller_ptr, endpoint_t src,
 	message *m_buff_usr, int flags)
 {
 	int other_p,result;
+	assert(proc_locked(caller_ptr));
 	/* A flag is set so that notifications cannot interrupt SENDREC. */
 	caller_ptr->p_misc_flags |= MF_REPLY_PEND;
 	result = mini_send_no_lock(caller_ptr, src, m_buff_usr, 0);
@@ -1046,6 +1050,7 @@ static int mini_receive_no_lock(struct proc * caller_ptr,
   int r, src_id, found, src_proc_nr, src_p;
   endpoint_t sender_e;
 
+  assert(proc_locked(caller_ptr));
   assert(!(caller_ptr->p_misc_flags & MF_DELIVERMSG));
 
   /* This is where we want our message. */
@@ -1130,6 +1135,7 @@ static int mini_receive_no_lock(struct proc * caller_ptr,
 
         if (CANRECEIVE(src_e, sender_e, caller_ptr, 0, &sender->p_sendmsg)) {
             int call;
+	    assert(proc_locked(sender));
 	    assert(!RTS_ISSET(sender, RTS_SLOT_FREE));
 	    assert(!RTS_ISSET(sender, RTS_NO_ENDPOINT));
 
@@ -1229,6 +1235,7 @@ static struct proc *peek_pending_async(struct proc *caller_ptr)
 		 * Do not copy from a process which does not have a stable address space
 		 * due to VM fiddling with it
 		 */
+		//TODO: Should we lock src_ptr ?
 		if (RTS_ISSET(src_ptr, RTS_VMINHIBIT)) {
 			src_ptr->p_misc_flags |= MF_SENDA_VM_MISS;
 			continue;
@@ -1297,7 +1304,7 @@ retry:
 		/* Nothing has changed while re-acquiring the locks, we can
 		 * call mini_receive_no_lock now. */
 	} else {
-		unlock_two_procs(caller_ptr,src_ptr);
+		lock_two_procs(caller_ptr,src_ptr);
 	}
 
 	res = mini_receive_no_lock(caller_ptr,src_e,m_buff_usr,flags);
@@ -1329,6 +1336,8 @@ int mini_notify_no_lock(
   }
 
   dst_ptr = proc_addr(dst_p);
+
+  assert(proc_locked(dst_ptr));
 
   /* Check to see if target is blocked waiting for this message. A process 
    * can be both sending and receiving during a SENDREC system call.
@@ -1429,6 +1438,8 @@ int try_deliver_senda(struct proc *caller_ptr,
   const vir_bytes table_v = (vir_bytes) table;
   message *m_ptr = NULL;
 
+  assert(proc_locked(caller_ptr));
+
   privp = priv(caller_ptr);
 
   /* Clear table */
@@ -1490,6 +1501,7 @@ int try_deliver_senda(struct proc *caller_ptr,
 	if (r == OK && RTS_ISSET(dst_ptr, RTS_NO_ENDPOINT)) {
 		r = EDEADSRCDST;
 	}
+	assert(proc_locked(dst_ptr));
 
 	/* Check if 'dst' is blocked waiting for this message.
 	 * If AMF_NOREPLY is set, do not satisfy the receiving part of
@@ -1583,6 +1595,7 @@ static int try_async(struct proc * caller_ptr)
   struct proc *src_ptr;
   sys_map_t *map;
 
+  assert(proc_locked(caller_ptr));
   map = &priv(caller_ptr)->s_asyn_pending;
 
   /* Try all privilege structures */
@@ -1600,6 +1613,7 @@ static int try_async(struct proc * caller_ptr)
 	 * Do not copy from a process which does not have a stable address space
 	 * due to VM fiddling with it
 	 */
+	// TODO: Should we lock src_ptr in this case ?
 	if (RTS_ISSET(src_ptr, RTS_VMINHIBIT)) {
 		src_ptr->p_misc_flags |= MF_SENDA_VM_MISS;
 		continue;
@@ -1730,6 +1744,7 @@ store_result:
 	privp->s_asyntab = -1;
 	privp->s_asynsize = 0;
   } else {
+	assert(proc_locked(dst_ptr));
 	set_sys_bit(priv(dst_ptr)->s_asyn_pending, privp->s_id);
   }
 
@@ -1752,6 +1767,9 @@ int cancel_async(struct proc *src_ptr, struct proc *dst_ptr)
   struct priv *privp;
   asynmsg_t tabent;
   vir_bytes table_v;
+
+  assert(proc_locked(src_ptr));
+  assert(proc_locked(dst_ptr));
 
   privp = priv(src_ptr);
   if (!(privp->s_flags & SYS_PROC)) return(EPERM);
@@ -2301,6 +2319,7 @@ void lock_proc(struct proc *p)
 		return;
 	/* For now we bypass the reentrant locks. */
 	spinlock_lock(&(p->p_lock.lock));
+	p->p_lock.owner = cpuid;
 }
 
 void unlock_proc(struct proc *p)
@@ -2309,7 +2328,13 @@ void unlock_proc(struct proc *p)
 	if(!p)
 		return;
 	/* For now we bypass the reentrant locks. */
+	p->p_lock.owner = -1;
 	spinlock_unlock(&(p->p_lock.lock));
+}
+
+int proc_locked(struct proc *p)
+{
+	return p->p_lock.lock.val==1&&p->p_lock.owner==cpuid;
 }
 
 void lock_two_procs(struct proc *p1,struct proc *p2)

@@ -78,11 +78,14 @@ char *bkl_file = NULL;
 
 void lock_all_procs(void)
 {
-	int p,nprocs;
+	int p,nprocs,cpu;
 	nprocs = sizeof(proc)/sizeof(struct proc);
-	for(p=0;p<nprocs;++p)
-		lock_proc(&(proc[p]));
-	bkl_owner = cpuid;
+	cpu = cpuid;
+	for(p=0;p<nprocs;++p) {
+		spinlock_lock(&(proc[p].p_lock.lock));
+		proc[p].p_lock.owner = cpu;
+	}
+	bkl_owner = cpu;
 	bkl_acq_count++;
 }
 
@@ -91,8 +94,10 @@ void unlock_all_procs(void)
 	int p,nprocs;
 	bkl_owner = -1;
 	nprocs = sizeof(proc)/sizeof(struct proc);
-	for(p=0;p<nprocs;++p)
-		unlock_proc(&(proc[p]));
+	for(p=0;p<nprocs;++p) {
+		proc[p].p_lock.owner = -1;
+		spinlock_unlock(&(proc[p].p_lock.lock));
+	}
 }
 
 void _reentrantlock_lock(reentrantlock_t *rl)
