@@ -1037,6 +1037,133 @@ static int mini_sendrec(struct proc *caller_ptr, endpoint_t src,
 /*===========================================================================*
  *				mini_receive				     * 
  *===========================================================================*/
+static int set_waiting_receiving(struct proc *caller_ptr, endpoint_t src_e, int non_blocking)
+{
+  if (non_blocking) {
+	return ENOTREADY;
+  } else {
+      /* Check for a possible deadlock before actually blocking. */
+      if (deadlock(RECEIVE, caller_ptr, src_e)) {
+          return(ELOCKED);
+      }
+
+      caller_ptr->p_getfrom_e = src_e;		
+      caller_ptr->p_deliver_type = MSG_TYPE_NULL;
+      RTS_SET(caller_ptr, RTS_RECEIVING);
+      return(OK);
+  }
+}
+
+static int check_pending_notif(struct proc *caller_ptr,int src_e,int src_p)
+{
+	/* Check for pending notifications */
+	const int src_id = has_pending_notify(caller_ptr, src_p);
+	const int found = src_id != NULL_PRIV_ID;
+	int src_proc_nr,sender_e;
+
+	if(found) {
+		src_proc_nr = id_to_nr(src_id);		/* get source proc */
+		sender_e = proc_addr(src_proc_nr)->p_endpoint;
+	}
+
+	if (found&&CANRECEIVE(src_e,sender_e,caller_ptr,0,&m_notify_buff)) {
+
+#if DEBUG_ENABLE_IPC_WARNINGS
+		if(src_proc_nr == NONE) {
+			printf("mini_receive: sending notify from NONE\n");
+		}
+#endif
+		assert(src_proc_nr != NONE);
+		unset_notify_pending(caller_ptr, src_id);	/* no longer pending */
+
+		/* Found a suitable source, deliver the notification message. */
+		assert(!(caller_ptr->p_misc_flags & MF_DELIVERMSG));	
+		assert(src_e == ANY || sender_e == src_e);
+
+		/* assemble message */
+		BuildNotifyMessage(&caller_ptr->p_delivermsg, src_proc_nr, caller_ptr);
+		caller_ptr->p_delivermsg.m_source = sender_e;
+		caller_ptr->p_misc_flags |= MF_DELIVERMSG;
+
+		IPC_STATUS_ADD_CALL(caller_ptr, NOTIFY);
+
+		return 1; // Success
+	}
+	return 0; // Failure
+}
+
+static int check_pending_async(struct proc *caller_ptr,int src_e,int src_p)
+{
+	/* Check for pending asynchronous messages */
+	int r;
+	if (has_pending_asend(caller_ptr, src_p) != NULL_PRIV_ID) {
+		if (src_p != ANY)
+			r = try_one(src_e, proc_addr(src_p), caller_ptr);
+		else
+			r = try_async(caller_ptr);
+
+		if (r == OK) {
+			IPC_STATUS_ADD_CALL(caller_ptr, SENDA);
+			return 1;
+		}
+	}
+	return 0;
+}
+
+static int check_caller_queue(struct proc *caller_ptr,int src_e)
+{
+	struct proc **xpp = &caller_ptr->p_caller_q;
+	while (*xpp) {
+		struct proc * const sender = *xpp;
+		const endpoint_t sender_e = sender->p_endpoint;
+
+		if (CANRECEIVE(src_e, sender_e, caller_ptr, 0, &sender->p_sendmsg)) {
+			assert(proc_locked(sender));
+			assert(!RTS_ISSET(sender, RTS_SLOT_FREE));
+			assert(!RTS_ISSET(sender, RTS_NO_ENDPOINT));
+
+			/* Found acceptable message. Copy it and update status. */
+			assert(!(caller_ptr->p_misc_flags & MF_DELIVERMSG));
+			caller_ptr->p_delivermsg = sender->p_sendmsg;
+			caller_ptr->p_delivermsg.m_source = sender->p_endpoint;
+			caller_ptr->p_misc_flags |= MF_DELIVERMSG;
+			RTS_UNSET(sender, RTS_SENDING);
+
+			const int call = (sender->p_misc_flags & MF_REPLY_PEND ? SENDREC : SEND);
+			IPC_STATUS_ADD_CALL(caller_ptr, call);
+
+			/*
+			 * if the message is originally from the kernel on behalf of this
+			 * process, we must send the status flags accordingly
+			 */
+			if (sender->p_misc_flags & MF_SENDING_FROM_KERNEL) {
+				IPC_STATUS_ADD_FLAGS(caller_ptr, IPC_FLG_MSG_FROM_KERNEL);
+				/* we can clean the flag now, not need anymore */
+				sender->p_misc_flags &= ~MF_SENDING_FROM_KERNEL;
+			}
+			if (sender->p_misc_flags & MF_SIG_DELAY)
+				sig_delay_done(sender);
+
+#if DEBUG_IPC_HOOK
+			hook_ipc_msgrecv(&caller_ptr->p_delivermsg, *xpp, caller_ptr);
+#endif
+
+			*xpp = sender->p_q_link;		/* remove from queue */
+			sender->p_q_link = NULL;
+			return 1;
+		}
+		assert(src_e!=ANY);
+		xpp = &sender->p_q_link;		/* proceed to next */
+	}
+	return 0;
+}
+
+static void receive_done(struct proc *caller_ptr)
+{
+  if (caller_ptr->p_misc_flags & MF_REPLY_PEND)
+	  caller_ptr->p_misc_flags &= ~MF_REPLY_PEND;
+}
+
 static int mini_receive_no_lock(struct proc * caller_ptr,
 			endpoint_t src_e, /* which message source is wanted */
 			message * m_buff_usr, /* pointer to message buffer */
@@ -1049,6 +1176,7 @@ static int mini_receive_no_lock(struct proc * caller_ptr,
   register struct proc **xpp;
   int r, src_id, found, src_proc_nr, src_p;
   endpoint_t sender_e;
+  const int is_non_blocking = flags&NON_BLOCKING;
 
   assert(proc_locked(caller_ptr));
   assert(!(caller_ptr->p_misc_flags & MF_DELIVERMSG));
@@ -1070,130 +1198,29 @@ static int mini_receive_no_lock(struct proc * caller_ptr,
 	}
   }
 
-
   /* Check to see if a message from desired source is already available.  The
    * caller's RTS_SENDING flag may be set if SENDREC couldn't send. If it is
    * set, the process should be blocked.
    */
-  if (!RTS_ISSET(caller_ptr, RTS_SENDING)) {
-
-    /* Check if there are pending notifications, except for SENDREC. */
-    if (! (caller_ptr->p_misc_flags & MF_REPLY_PEND)) {
-
-	/* Check for pending notifications */
-        src_id = has_pending_notify(caller_ptr, src_p);
-        found = src_id != NULL_PRIV_ID;
-        if(found) {
-            src_proc_nr = id_to_nr(src_id);		/* get source proc */
-            sender_e = proc_addr(src_proc_nr)->p_endpoint;
-        }
-
-        if (found && CANRECEIVE(src_e, sender_e, caller_ptr, 0,
-          &m_notify_buff)) {
-
-#if DEBUG_ENABLE_IPC_WARNINGS
-	    if(src_proc_nr == NONE) {
-		printf("mini_receive: sending notify from NONE\n");
-	    }
-#endif
-	    assert(src_proc_nr != NONE);
-            unset_notify_pending(caller_ptr, src_id);	/* no longer pending */
-
-            /* Found a suitable source, deliver the notification message. */
-	    assert(!(caller_ptr->p_misc_flags & MF_DELIVERMSG));	
-	    assert(src_e == ANY || sender_e == src_e);
-
-	    /* assemble message */
-	    BuildNotifyMessage(&caller_ptr->p_delivermsg, src_proc_nr, caller_ptr);
-	    caller_ptr->p_delivermsg.m_source = sender_e;
-	    caller_ptr->p_misc_flags |= MF_DELIVERMSG;
-
-	    IPC_STATUS_ADD_CALL(caller_ptr, NOTIFY);
-
-	    goto receive_done;
-        }
-    }
-
-    /* Check for pending asynchronous messages */
-    if (has_pending_asend(caller_ptr, src_p) != NULL_PRIV_ID) {
-        if (src_p != ANY)
-		r = try_one(src_e, proc_addr(src_p), caller_ptr);
-        else
-        	r = try_async(caller_ptr);
-
-	if (r == OK) {
-            IPC_STATUS_ADD_CALL(caller_ptr, SENDA);
-            goto receive_done;
-        }
-    }
-
-    /* Check caller queue. Use pointer pointers to keep code simple. */
-    xpp = &caller_ptr->p_caller_q;
-    while (*xpp) {
-	struct proc * sender = *xpp;
-	endpoint_t sender_e = sender->p_endpoint;
-
-        if (CANRECEIVE(src_e, sender_e, caller_ptr, 0, &sender->p_sendmsg)) {
-            int call;
-	    assert(proc_locked(sender));
-	    assert(!RTS_ISSET(sender, RTS_SLOT_FREE));
-	    assert(!RTS_ISSET(sender, RTS_NO_ENDPOINT));
-
-	    /* Found acceptable message. Copy it and update status. */
-  	    assert(!(caller_ptr->p_misc_flags & MF_DELIVERMSG));
-	    caller_ptr->p_delivermsg = sender->p_sendmsg;
-	    caller_ptr->p_delivermsg.m_source = sender->p_endpoint;
-	    caller_ptr->p_misc_flags |= MF_DELIVERMSG;
-	    RTS_UNSET(sender, RTS_SENDING);
-
-	    call = (sender->p_misc_flags & MF_REPLY_PEND ? SENDREC : SEND);
-	    IPC_STATUS_ADD_CALL(caller_ptr, call);
-
-	    /*
-	     * if the message is originally from the kernel on behalf of this
-	     * process, we must send the status flags accordingly
-	     */
-	    if (sender->p_misc_flags & MF_SENDING_FROM_KERNEL) {
-		IPC_STATUS_ADD_FLAGS(caller_ptr, IPC_FLG_MSG_FROM_KERNEL);
-		/* we can clean the flag now, not need anymore */
-		sender->p_misc_flags &= ~MF_SENDING_FROM_KERNEL;
-	    }
-	    if (sender->p_misc_flags & MF_SIG_DELAY)
-		sig_delay_done(sender);
-
-#if DEBUG_IPC_HOOK
-            hook_ipc_msgrecv(&caller_ptr->p_delivermsg, *xpp, caller_ptr);
-#endif
-		
-            *xpp = sender->p_q_link;		/* remove from queue */
-	    sender->p_q_link = NULL;
-	    goto receive_done;
-	}
-	assert(src_e!=ANY);
-	xpp = &sender->p_q_link;		/* proceed to next */
-    }
+  if(RTS_ISSET(caller_ptr,RTS_SENDING)) {
+	  return set_waiting_receiving(caller_ptr,src_e,is_non_blocking);
   }
 
-  /* No suitable message is available or the caller couldn't send in SENDREC. 
-   * Block the process trying to receive, unless the flags tell otherwise.
-   */
-  if ( ! (flags & NON_BLOCKING)) {
-      /* Check for a possible deadlock before actually blocking. */
-      if (deadlock(RECEIVE, caller_ptr, src_e)) {
-          return(ELOCKED);
-      }
-
-      caller_ptr->p_getfrom_e = src_e;		
-      caller_ptr->p_deliver_type = MSG_TYPE_NULL;
-      RTS_SET(caller_ptr, RTS_RECEIVING);
-      return(OK);
-  } else {
-	return(ENOTREADY);
+  /* Check if there are pending notifications, except for SENDREC. */
+  if (! (caller_ptr->p_misc_flags & MF_REPLY_PEND)) {
+	  if(check_pending_notif(caller_ptr,src_e,src_p)) {
+		  receive_done(caller_ptr);
+		  return OK;
+	  }
+  }
+  
+  if(!check_pending_async(caller_ptr,src_e,src_p)) {
+	  /* Check caller queue. Use pointer pointers to keep code simple. */
+	  if(!check_caller_queue(caller_ptr,src_e))
+		  return set_waiting_receiving(caller_ptr,src_e,is_non_blocking);
   }
 
-receive_done:
-  if (caller_ptr->p_misc_flags & MF_REPLY_PEND)
-	  caller_ptr->p_misc_flags &= ~MF_REPLY_PEND;
+  receive_done(caller_ptr);
   return OK;
 }
 
