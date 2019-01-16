@@ -2816,12 +2816,12 @@ static inline int _ipc_sendnb(endpoint_t dest, message *m_ptr)
 {
 	int tries,max_tries,res;
 
-	max_tries = 1;
+	max_tries = 64;
 #define ENOTREADY -201 /* Re-def it here. Hack. */
 	res = ENOTREADY;
 
 	for(tries=0;tries<max_tries&&res==ENOTREADY;++tries) {
-		tries++;
+		tries=0;
 		res = _minix_ipcvecs.sendnb(dest, m_ptr);
 	}
 	return res;

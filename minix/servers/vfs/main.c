@@ -639,14 +639,23 @@ void reply(message *m_out, endpoint_t whom, int result)
 {
 /* Send a reply to a user process.  If the send fails, just ignore it. */
   int r;
+  int retried = 0;
 
   m_out->m_type = result;
 
+retry:
   r = ipc_sendnb(whom, m_out);
   if (r != OK) {
 	printf("VFS: %d couldn't send reply %d to %d: %d\n", mthread_self(),
 		result, whom, r);
 	util_stacktrace();
+	if(r==ENOTREADY) {
+		retried = 1;
+		goto retry;
+	}
+  } else {
+	  if(retried)
+		printf("VFS: %d successfully sent reply %d to %d: %d\n", mthread_self(),result,whom,r);
   }
 }
 

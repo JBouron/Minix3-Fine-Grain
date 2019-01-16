@@ -232,6 +232,7 @@ void abort_proc_ipc_send(struct proc *rp)
           }
           xpp = &(*xpp)->p_q_link;
       }
+      rp->p_sendto_e = NONE;
   }
 }
 

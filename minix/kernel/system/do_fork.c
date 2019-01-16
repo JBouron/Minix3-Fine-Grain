@@ -95,6 +95,8 @@ int do_fork(struct proc * caller, message * m_ptr)
   rpc->p_kcall_cycles = 0;
   rpc->p_kipc_cycles = 0;
 
+  rpc->p_sendto_e = NONE;
+
   rpc->p_tick_cycles = 0;
   cpuavg_init(&rpc->p_cpuavg);
 

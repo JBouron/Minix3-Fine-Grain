@@ -142,13 +142,11 @@ int do_vmctl(struct proc * caller, message * m_ptr)
 		 */
 		RTS_UNSET(p, RTS_VMINHIBIT);
 #ifdef CONFIG_SMP
-		if (p->p_misc_flags & MF_SENDA_VM_MISS) {
-			struct priv *privp;
-			p->p_misc_flags &= ~MF_SENDA_VM_MISS;
-			privp = priv(p);
-			try_deliver_senda(p, (asynmsg_t *) privp->s_asyntab,
-							privp->s_asynsize);
-		}
+		struct priv *privp;
+		p->p_misc_flags &= ~MF_SENDA_VM_MISS;
+		privp = priv(p);
+		if(privp)
+			try_deliver_senda(p,(asynmsg_t*)privp->s_asyntab,privp->s_asynsize);
 		/*
 		 * We don't know whether kernel has the changed mapping
 		 * installed to access userspace memory. And if so, on what CPU.

@@ -54,7 +54,7 @@ static int mini_send(struct proc *caller_ptr, endpoint_t dst_e, message
 */
 static int mini_sendrec(struct proc *caller_ptr, endpoint_t src,
 	message *m_buff_usr, int flags);
-static int mini_sendrec_no_lock(struct proc *caller_ptr, endpoint_t src,
+static int mini_sendrec_no_lock(struct proc *caller_ptr, struct proc *to,
 	message *m_buff_usr, int flags);
 
 static int mini_receive(struct proc *caller_ptr, endpoint_t src,
@@ -149,6 +149,7 @@ void proc_init(void)
 
 		rp->p_enqueued = 0;		/* Proc's not enqueued yet. */
 		rp->p_deliver_type = MSG_TYPE_NULL;	/* No message received yet. */
+		rp->p_sendto_e = NONE;		/* Proc's not blocked sending. */
 
 		/* arch-specific initialization */
 		arch_proc_reset(rp);
@@ -799,7 +800,7 @@ static int has_pending(sys_map_t *map, int src_p, int asynm)
 #ifdef CONFIG_SMP
 		p = proc_addr(id_to_nr(src_id));
 		if (asynm && RTS_ISSET(p, RTS_VMINHIBIT))
-			p->p_misc_flags |= MF_SENDA_VM_MISS;
+			(void)0;
 		else
 #endif
 			id = src_id;
@@ -824,7 +825,6 @@ static int has_pending(sys_map_t *map, int src_p, int asynm)
 				 * Skip it.
 				 */
 				if (asynm && RTS_ISSET(p, RTS_VMINHIBIT)) {
-					p->p_misc_flags |= MF_SENDA_VM_MISS;
 					src_id++;
 				} else
 					goto quit_search;
@@ -973,6 +973,7 @@ int mini_send_no_lock(
 	hook_ipc_msgsend(&caller_ptr->p_sendmsg, caller_ptr, dst_ptr);
 #endif
   }
+  dst_ptr->p_new_message = 1;
   return(OK);
 }
 
@@ -1000,14 +1001,16 @@ int mini_send(
 /*===========================================================================*
  *				mini_sendrec				     * 
  *===========================================================================*/
-static int mini_sendrec_no_lock(struct proc *caller_ptr, endpoint_t src,
+static int mini_sendrec_no_lock(struct proc *caller_ptr, struct proc *to,
 	message *m_buff_usr, int flags)
 {
 	int other_p,result;
+	const int src = to->p_endpoint;
 	assert(proc_locked(caller_ptr));
 	/* A flag is set so that notifications cannot interrupt SENDREC. */
 	caller_ptr->p_misc_flags |= MF_REPLY_PEND;
 	result = mini_send_no_lock(caller_ptr, src, m_buff_usr, 0);
+	unlock_proc(to);
 	if(result==OK) {
 		result = mini_receive_no_lock(caller_ptr, src, m_buff_usr, 0);
 	}
@@ -1028,8 +1031,10 @@ static int mini_sendrec(struct proc *caller_ptr, endpoint_t src,
 	 * receive is not ANY. */
 
 	lock_two_procs(caller_ptr,other_ptr);
-	res = mini_sendrec_no_lock(caller_ptr,src,m_buff_usr,flags);
-	unlock_two_procs(caller_ptr,other_ptr);
+	res = mini_sendrec_no_lock(caller_ptr,other_ptr,m_buff_usr,flags);
+
+	/* other_ptr has been unlocked in mini_sendrec_no_lock. */
+	unlock_proc(caller_ptr);
 
 	return res;
 }
@@ -1097,10 +1102,12 @@ static int check_pending_async(struct proc *caller_ptr,int src_e,int src_p)
 	/* Check for pending asynchronous messages */
 	int r;
 	if (has_pending_asend(caller_ptr, src_p) != NULL_PRIV_ID) {
-		if (src_p != ANY)
+		if (src_p != ANY) {
+			/* We alredy acquired the locks in mini_receive_no_lock. */
 			r = try_one(src_e, proc_addr(src_p), caller_ptr);
-		else
+		} else {
 			r = try_async(caller_ptr);
+		}
 
 		if (r == OK) {
 			IPC_STATUS_ADD_CALL(caller_ptr, SENDA);
@@ -1112,50 +1119,113 @@ static int check_pending_async(struct proc *caller_ptr,int src_e,int src_p)
 
 static int check_caller_queue(struct proc *caller_ptr,int src_e)
 {
-	struct proc **xpp = &caller_ptr->p_caller_q;
-	while (*xpp) {
-		struct proc * const sender = *xpp;
-		const endpoint_t sender_e = sender->p_endpoint;
+	int result = 0;
+	if(src_e!=ANY) {
+		/* If we want to deliver from a particular endpoint, no need
+		 * to go over the entire caller list. */
+		int src_p;
+		okendpt(src_e, &src_p);
+		struct proc *const src_ptr = proc_addr(src_p);
 
-		if (CANRECEIVE(src_e, sender_e, caller_ptr, 0, &sender->p_sendmsg)) {
-			assert(proc_locked(sender));
-			assert(!RTS_ISSET(sender, RTS_SLOT_FREE));
-			assert(!RTS_ISSET(sender, RTS_NO_ENDPOINT));
+		lock_two_procs(caller_ptr,src_ptr);
+		if(src_ptr->p_sendto_e==caller_ptr->p_endpoint) {
+			/* The source is indeed in the caller chain. */
+			assert(CANRECEIVE(src_e, src_e, caller_ptr, 0, &src_ptr->p_sendmsg));
+			assert(proc_locked(src_ptr));
+			assert(proc_locked(caller_ptr));
+			assert(!RTS_ISSET(src_ptr, RTS_SLOT_FREE));
+			assert(!RTS_ISSET(src_ptr, RTS_NO_ENDPOINT));
 
 			/* Found acceptable message. Copy it and update status. */
 			assert(!(caller_ptr->p_misc_flags & MF_DELIVERMSG));
-			caller_ptr->p_delivermsg = sender->p_sendmsg;
-			caller_ptr->p_delivermsg.m_source = sender->p_endpoint;
+			caller_ptr->p_delivermsg = src_ptr->p_sendmsg;
+			caller_ptr->p_delivermsg.m_source = src_ptr->p_endpoint;
 			caller_ptr->p_misc_flags |= MF_DELIVERMSG;
-			RTS_UNSET(sender, RTS_SENDING);
+			RTS_UNSET(src_ptr, RTS_SENDING);
 
-			const int call = (sender->p_misc_flags & MF_REPLY_PEND ? SENDREC : SEND);
+			const int call = (src_ptr->p_misc_flags & MF_REPLY_PEND ? SENDREC : SEND);
 			IPC_STATUS_ADD_CALL(caller_ptr, call);
 
 			/*
 			 * if the message is originally from the kernel on behalf of this
 			 * process, we must send the status flags accordingly
 			 */
-			if (sender->p_misc_flags & MF_SENDING_FROM_KERNEL) {
+			if (src_ptr->p_misc_flags & MF_SENDING_FROM_KERNEL) {
 				IPC_STATUS_ADD_FLAGS(caller_ptr, IPC_FLG_MSG_FROM_KERNEL);
 				/* we can clean the flag now, not need anymore */
-				sender->p_misc_flags &= ~MF_SENDING_FROM_KERNEL;
+				src_ptr->p_misc_flags &= ~MF_SENDING_FROM_KERNEL;
 			}
-			if (sender->p_misc_flags & MF_SIG_DELAY)
-				sig_delay_done(sender);
+			if (src_ptr->p_misc_flags & MF_SIG_DELAY)
+				sig_delay_done(src_ptr);
 
 #if DEBUG_IPC_HOOK
 			hook_ipc_msgrecv(&caller_ptr->p_delivermsg, *xpp, caller_ptr);
 #endif
 
-			*xpp = sender->p_q_link;		/* remove from queue */
-			sender->p_q_link = NULL;
-			return 1;
+			/* Remove src_ptr from the caller chain. */
+			struct proc **xpp = &caller_ptr->p_caller_q;
+			while (*xpp!=src_ptr) {
+				/* src_ptr must be in the chain. */
+				assert(*xpp);
+				assert((*xpp)->p_q_link);
+				xpp = &((*xpp)->p_q_link);	
+				assert(*xpp);
+			}
+			*xpp = src_ptr->p_q_link;
+			src_ptr->p_q_link = NULL;
+			src_ptr->p_sendto_e = NONE; // Reset
+			result = 1;
 		}
-		assert(src_e!=ANY);
-		xpp = &sender->p_q_link;		/* proceed to next */
+		unlock_two_procs(caller_ptr,src_ptr);
+	} else {
+		/* If we want to deliver from ANY simply take the first proc
+		 * in the caller chain. */
+		struct proc *const first = caller_ptr->p_caller_q;
+		if(!first) {
+			return 0;
+		}
+		const int first_e = first->p_endpoint;
+
+		lock_two_procs(caller_ptr,first);
+		assert(CANRECEIVE(src_e, first_e, caller_ptr, 0, &first->p_sendmsg));
+		assert(proc_locked(first));
+		assert(proc_locked(caller_ptr));
+		assert(!RTS_ISSET(first, RTS_SLOT_FREE));
+		assert(!RTS_ISSET(first, RTS_NO_ENDPOINT));
+
+		/* Found acceptable message. Copy it and update status. */
+		assert(!(caller_ptr->p_misc_flags & MF_DELIVERMSG));
+		caller_ptr->p_delivermsg = first->p_sendmsg;
+		caller_ptr->p_delivermsg.m_source = first->p_endpoint;
+		caller_ptr->p_misc_flags |= MF_DELIVERMSG;
+		RTS_UNSET(first, RTS_SENDING);
+
+		const int call = (first->p_misc_flags & MF_REPLY_PEND ? SENDREC : SEND);
+		IPC_STATUS_ADD_CALL(caller_ptr, call);
+
+		/*
+		 * if the message is originally from the kernel on behalf of this
+		 * process, we must send the status flags accordingly
+		 */
+		if (first->p_misc_flags & MF_SENDING_FROM_KERNEL) {
+			IPC_STATUS_ADD_FLAGS(caller_ptr, IPC_FLG_MSG_FROM_KERNEL);
+			/* we can clean the flag now, not need anymore */
+			first->p_misc_flags &= ~MF_SENDING_FROM_KERNEL;
+		}
+		if (first->p_misc_flags & MF_SIG_DELAY)
+			sig_delay_done(first);
+
+#if DEBUG_IPC_HOOK
+		hook_ipc_msgrecv(&caller_ptr->p_delivermsg, *xpp, caller_ptr);
+#endif
+
+		caller_ptr->p_caller_q = first->p_q_link;
+		first->p_q_link = NULL; // remove from chain
+		first->p_sendto_e = NONE;
+		unlock_two_procs(caller_ptr,first);
+		result = 1;
 	}
-	return 0;
+	return result;
 }
 
 static void receive_done(struct proc *caller_ptr)
@@ -1174,10 +1244,14 @@ static int mini_receive_no_lock(struct proc * caller_ptr,
  * is available block the caller.
  */
   register struct proc **xpp;
+  struct proc *src_ptr;
   int r, src_id, found, src_proc_nr, src_p;
   endpoint_t sender_e;
   const int is_non_blocking = flags&NON_BLOCKING;
+  int tries = 0;
 
+retry:
+  tries ++;
   assert(proc_locked(caller_ptr));
   assert(!(caller_ptr->p_misc_flags & MF_DELIVERMSG));
 
@@ -1208,20 +1282,51 @@ static int mini_receive_no_lock(struct proc * caller_ptr,
 
   /* Check if there are pending notifications, except for SENDREC. */
   if (! (caller_ptr->p_misc_flags & MF_REPLY_PEND)) {
+	  /* We don't need any other lock for notifs. */
 	  if(check_pending_notif(caller_ptr,src_e,src_p)) {
 		  receive_done(caller_ptr);
 		  return OK;
 	  }
   }
-  
-  if(!check_pending_async(caller_ptr,src_e,src_p)) {
-	  /* Check caller queue. Use pointer pointers to keep code simple. */
-	  if(!check_caller_queue(caller_ptr,src_e))
-		  return set_waiting_receiving(caller_ptr,src_e,is_non_blocking);
+
+  /* Checking the async messages and the caller queue will need other locks.
+   * Which means we will have to release caller_ptr at some point.
+   * By doing so another proc may send us a message in the mean time, look at
+   * p_new_message to check if it happened. */
+  caller_ptr->p_new_message = 0;
+  unlock_proc(caller_ptr);
+
+  if(src_p!=ANY) {
+	  /* In case of non-ANY source we can already acquire the locks. */
+	  src_ptr = proc_addr(src_p);
+	  lock_two_procs(caller_ptr,src_ptr);
+  }
+  r = check_pending_async(caller_ptr,src_e,src_p);
+  if(src_p!=ANY) {
+	  unlock_two_procs(caller_ptr,src_ptr);
   }
 
-  receive_done(caller_ptr);
-  return OK;
+  if(r) {
+	  /* We found an async message, deliver it. */
+	  lock_proc(caller_ptr); // The caller expects it.
+	  receive_done(caller_ptr);
+	  return OK;
+  }
+
+  /* Finally check the caller queue. */
+  if(check_caller_queue(caller_ptr,src_e)) {
+	  lock_proc(caller_ptr); // The caller expects it.
+	  receive_done(caller_ptr);
+	  return OK;
+  }
+
+  /* Nothing worked, check if nobody sent a message in the meantime. If not
+   * then we can safely block. */
+  lock_proc(caller_ptr);
+  if(caller_ptr->p_new_message)
+	  goto retry;
+  else
+	  return set_waiting_receiving(caller_ptr,src_e,is_non_blocking);
 }
 
 /*
@@ -1283,64 +1388,9 @@ static int mini_receive(struct proc * caller_ptr,
 			message * m_buff_usr, /* pointer to message buffer */
 			const int flags)
 {
-	int res,src_p;
-	struct proc *src_ptr,*next_notif,*next_async,*next_queue;
-
-	src_p = _ENDPOINT_P(src_e);
-	src_ptr = proc_addr(src_p);
-
-	/* If we are receiving from a specific source lock only the caller and
-	 * the source. */
- 	if(src_e==ANY) {
-		/* When dealing with ANY we need to be a bit more careful.
-		 * In this case we can deliver the message in 3 ways:
-		 * 	_ A pending notification.
-		 * 	_ A pending async message.
-		 * 	_ A process in the wait queue.
-		 *
-		 * mini_receive will try the three ways (in that order) and
-		 * deliver the first message it finds.
-		 * The difficult thing here is to lock correctly (wrt the
-		 * order). Thus locking inside each way would be very
-		 * difficult.
-		 * What we do here is "emulate" the three checks and lock the
-		 * procs that would be used for each case. Once we have all
-		 * the procs we can lock them.
-		 */
-		lock_proc(caller_ptr);
-retry:
-		// TODO: We need to be very careful here, the next_.* procs
-		// may be duplicates.
-		next_notif = peek_pending_notif(caller_ptr);
-		next_async = peek_pending_async(caller_ptr);
-		next_queue = peek_queue(caller_ptr);
-
-		/* Unlock the caller and re-acquire all the locks in order. */
-		unlock_proc(caller_ptr);
-		lock_four_procs(caller_ptr,next_notif,next_async,next_queue);
-
-		/* Check that nothing has changed in the meantime. */
-		if(next_notif!=peek_pending_notif(caller_ptr)||
-		   next_async!=peek_pending_async(caller_ptr)||
-		   next_queue!=peek_queue(caller_ptr)) {
-			/* Keep the lock on caller_ptr. */
-			unlock_three_procs(next_notif,next_async,next_queue);
-			goto retry;
-		}
-
-		/* Nothing has changed while re-acquiring the locks, we can
-		 * call mini_receive_no_lock now. */
-	} else {
-		lock_two_procs(caller_ptr,src_ptr);
-	}
-
-	res = mini_receive_no_lock(caller_ptr,src_e,m_buff_usr,flags);
-
-	if(src_e==ANY) {
-		unlock_four_procs(caller_ptr,next_notif,next_async,next_queue);
-	} else
-		unlock_two_procs(caller_ptr,src_ptr);
-
+	lock_proc(caller_ptr);
+	const int res = mini_receive_no_lock(caller_ptr,src_e,m_buff_usr,flags);
+	unlock_proc(caller_ptr);
 	return res;
 }
 
@@ -1363,6 +1413,7 @@ int mini_notify_no_lock(
   }
 
   dst_ptr = proc_addr(dst_p);
+  dst_ptr->p_new_message = 1;
 
   assert(proc_locked(dst_ptr));
 
@@ -1534,6 +1585,8 @@ int try_deliver_senda(struct proc *caller_ptr,
 	 * If AMF_NOREPLY is set, do not satisfy the receiving part of
 	 * a SENDREC.
 	 */
+	if(r==OK)
+		dst_ptr->p_new_message = 1;
 	if (r == OK && WILLRECEIVE(caller_ptr->p_endpoint, dst_ptr,
 	    (vir_bytes)&table[i].msg, NULL) &&
 	    (!(flags&AMF_NOREPLY) || !(dst_ptr->p_misc_flags&MF_REPLY_PEND))) {
@@ -1622,7 +1675,6 @@ static int try_async(struct proc * caller_ptr)
   struct proc *src_ptr;
   sys_map_t *map;
 
-  assert(proc_locked(caller_ptr));
   map = &priv(caller_ptr)->s_asyn_pending;
 
   /* Try all privilege structures */
@@ -1640,15 +1692,16 @@ static int try_async(struct proc * caller_ptr)
 	 * Do not copy from a process which does not have a stable address space
 	 * due to VM fiddling with it
 	 */
-	// TODO: Should we lock src_ptr in this case ?
 	if (RTS_ISSET(src_ptr, RTS_VMINHIBIT)) {
-		src_ptr->p_misc_flags |= MF_SENDA_VM_MISS;
 		continue;
 	}
 #endif
 
+	lock_two_procs(caller_ptr,src_ptr);
 	assert(!(caller_ptr->p_misc_flags & MF_DELIVERMSG));
-	if ((r = try_one(ANY, src_ptr, caller_ptr)) == OK)
+	r = try_one(ANY, src_ptr, caller_ptr);
+	unlock_two_procs(caller_ptr,src_ptr);
+	if (r == OK)
 		return(r);
   }
 
@@ -1671,6 +1724,9 @@ static int try_one(endpoint_t receive_e, struct proc *src_ptr,
   struct priv *privp;
   asynmsg_t tabent;
   vir_bytes table_v;
+
+  assert(proc_locked(src_ptr));
+  assert(proc_locked(dst_ptr));
 
   privp = priv(src_ptr);
   if (!(privp->s_flags & SYS_PROC)) return(EPERM);

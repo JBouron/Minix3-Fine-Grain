@@ -31,6 +31,7 @@ struct proc {
   reentrantlock_t p_lock;	/* Lock for the process. */
   int p_enqueued;		/* Is the lock enqueued on it's cpu ? */
   int p_deliver_type;		/* What kind of message has been delivered ? */
+  int p_new_message;		/* Has the process received a new message ? */
 
   int __gdb_last_cpu_flag;
   int __gdb_line;
