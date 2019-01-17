@@ -912,6 +912,8 @@ int mini_send_no_lock(
 	if (!(flags & FROM_KERNEL)) {
 		if(copy_msg_from_user(m_ptr, &dst_ptr->p_delivermsg))
 			return EFAULT;
+		if(copy_msg_from_user(m_ptr, &caller_ptr->p_sendmsg))
+			return EFAULT;
 	} else {
 		dst_ptr->p_delivermsg = *m_ptr;
 		IPC_STATUS_ADD_FLAGS(dst_ptr, IPC_FLG_MSG_FROM_KERNEL);
@@ -1187,6 +1189,10 @@ static int check_caller_queue(struct proc *caller_ptr,int src_e)
 		const int first_e = first->p_endpoint;
 
 		lock_two_procs(caller_ptr,first);
+		// TODO: The following assert will fail in case of a race cond.
+		// Just get rid of the race cond already. But this one might
+		// not occur that often (or never).
+		assert(caller_ptr->p_caller_q==first);
 		assert(CANRECEIVE(src_e, first_e, caller_ptr, 0, &first->p_sendmsg));
 		assert(proc_locked(first));
 		assert(proc_locked(caller_ptr));
@@ -1305,7 +1311,6 @@ retry:
   if(src_p!=ANY) {
 	  unlock_two_procs(caller_ptr,src_ptr);
   }
-
   if(r) {
 	  /* We found an async message, deliver it. */
 	  lock_proc(caller_ptr); // The caller expects it.
@@ -1504,7 +1509,8 @@ field, caller->p_name, entry, priv(caller)->s_asynsize, priv(caller)->s_asyntab)
  *===========================================================================*/
 int try_deliver_senda(struct proc *caller_ptr,
 				asynmsg_t *table,
-				size_t size)
+				size_t size,
+				int lock)
 {
   int r, dst_p, done, do_notify;
   unsigned int i;
@@ -1545,6 +1551,7 @@ int try_deliver_senda(struct proc *caller_ptr,
   for (i = 0; i < size; i++) {
 	/* Process each entry in the table and store the result in the table.
 	 * If we're done handling a message, copy the result to the sender. */
+	assert(proc_locked(caller_ptr));
 
 	dst = NONE;
 	/* Copy message to kernel */
@@ -1575,6 +1582,11 @@ int try_deliver_senda(struct proc *caller_ptr,
 	else 	/* r == OK */
 		dst_ptr = proc_addr(dst_p);
 
+	if(lock) {
+		unlock_proc(caller_ptr);
+		lock_two_procs(caller_ptr,dst_ptr);
+	}
+
 	/* XXX: RTS_NO_ENDPOINT should be removed */
 	if (r == OK && RTS_ISSET(dst_ptr, RTS_NO_ENDPOINT)) {
 		r = EDEADSRCDST;
@@ -1601,11 +1613,19 @@ int try_deliver_senda(struct proc *caller_ptr,
 #if DEBUG_IPC_HOOK
 		hook_ipc_msgrecv(&dst_ptr->p_delivermsg, caller_ptr, dst_ptr);
 #endif
+		/* Keep the lock on caller_ptr for the end of ite (+ the next
+		 * one). */
+		if(lock)
+			unlock_proc(dst_ptr);
 	} else if (r == OK) {
 		/* Inform receiver that something is pending */
 		set_sys_bit(priv(dst_ptr)->s_asyn_pending, 
 			    priv(caller_ptr)->s_id); 
 		done = FALSE;
+		/* Keep the lock on caller_ptr for the end of ite (+ the next
+		 * one). */
+		if(lock)
+			unlock_proc(dst_ptr);
 		continue;
 	} 
 
@@ -1625,6 +1645,7 @@ asyn_error:
 	else
 		printf("KERNEL senda error %d\n", r);
   }
+  assert(proc_locked(caller_ptr));
 
   if (do_notify) 
 	mini_notify_no_lock(proc_addr(ASYNCM), caller_ptr->p_endpoint);
@@ -1650,16 +1671,16 @@ static int mini_senda_no_lock(struct proc *caller_ptr, asynmsg_t *table, size_t 
 	printf( "mini_senda: warning caller has no privilege structure\n");
 	return (EPERM);
   }
-  return try_deliver_senda(caller_ptr, table, size);
+  return try_deliver_senda(caller_ptr, table, size, 1);
 }
 
 static int mini_senda(struct proc *caller_ptr, asynmsg_t *table, size_t size)
 {
 	int res;
 
-	BKL_LOCK();
+	lock_proc(caller_ptr);
 	res = mini_senda_no_lock(caller_ptr,table,size);
-	BKL_UNLOCK();
+	unlock_proc(caller_ptr);
 
 	return res;
 }
@@ -1696,9 +1717,9 @@ static int try_async(struct proc * caller_ptr)
 		continue;
 	}
 #endif
-
 	lock_two_procs(caller_ptr,src_ptr);
 	assert(!(caller_ptr->p_misc_flags & MF_DELIVERMSG));
+	assert(!RTS_ISSET(src_ptr, RTS_VMINHIBIT));
 	r = try_one(ANY, src_ptr, caller_ptr);
 	unlock_two_procs(caller_ptr,src_ptr);
 	if (r == OK)

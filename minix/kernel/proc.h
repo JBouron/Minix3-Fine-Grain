@@ -287,7 +287,9 @@ struct proc {
 
 #define isokprocn(n)      ((unsigned) ((n) + NR_TASKS) < NR_PROCS + NR_TASKS)
 #define isemptyn(n)       isemptyp(proc_addr(n)) 
-#define isemptyp(p)       ((p)->p_rts_flags == RTS_SLOT_FREE)
+/* The RTS flags may contain older flags in case the proc got killed in the
+ * middle of a kernel operation on another cpu. */
+#define isemptyp(p)       ((p)->p_rts_flags&RTS_SLOT_FREE)
 #define iskernelp(p)	  ((p) < BEG_USER_ADDR)
 #define iskerneln(n)	  ((n) < 0)
 #define isuserp(p)        isusern((p) >= BEG_USER_ADDR)

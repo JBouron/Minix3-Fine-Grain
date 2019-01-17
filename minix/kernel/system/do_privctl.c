@@ -12,6 +12,7 @@
 #include "kernel/system.h"
 #include <signal.h>
 #include <string.h>
+#include <assert.h>
 #include <minix/endpoint.h>
 
 #if USE_PRIVCTL
@@ -118,10 +119,14 @@ int do_privctl(struct proc * caller, message * m_ptr)
 	priv(rp)->s_id = priv_id;		/* restore privilege id */
 	priv(rp)->s_proc_nr = proc_nr;		/* reassociate process nr */
 
-	for (i=0; i< NR_SYS_CHUNKS; i++)		/* remove pending: */
+	for (i=0; i< NR_SYS_CHUNKS; i++) {		/* remove pending: */
+	      assert(!priv(rp)->s_asyn_pending.chunk[i]);	/* - incoming asyn */
 	      priv(rp)->s_asyn_pending.chunk[i] = 0;	/* - incoming asyn */
-	for (i=0; i< NR_SYS_CHUNKS; i++)		/*   messages */
+	}
+	for (i=0; i< NR_SYS_CHUNKS; i++) {		/*   messages */
+	      //assert(!priv(rp)->s_notify_pending.chunk[i]);	/* - incoming asyn */
 	      priv(rp)->s_notify_pending.chunk[i] = 0;	/* - notifications */
+	}
 	priv(rp)->s_int_pending = 0;			/* - interrupts */
 	(void) sigemptyset(&priv(rp)->s_sig_pending);	/* - signals */
 	reset_kernel_timer(&priv(rp)->s_alarm_timer);	/* - alarm */
