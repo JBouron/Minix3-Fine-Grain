@@ -621,6 +621,7 @@ static int do_sync_ipc(struct proc * caller_ptr, /* who made the call */
 int do_ipc(reg_t r1, reg_t r2, reg_t r3)
 {
   struct proc *const caller_ptr = get_cpulocal_var(proc_ptr);	/* get pointer to caller */
+  caller_ptr->p_in_ipc_op = 1;
   int call_nr = (int) r1;
   int res = 0;
 
@@ -702,6 +703,7 @@ int do_ipc(reg_t r1, reg_t r2, reg_t r3)
 	}
   }
 end:
+  caller_ptr->p_in_ipc_op = 0;
   return res;
 }
 

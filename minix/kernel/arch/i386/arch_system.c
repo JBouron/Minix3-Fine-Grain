@@ -554,7 +554,11 @@ void arch_proc_setcontext(struct proc *p, struct stackframe_s *state,
 	 * not go well for the process (restored context will be ignored)
 	 * and the situation should be debugged.
 	 */
-	if(!(p->p_rts_flags)) {
+	if(!(p->p_rts_flags)&&!(p->p_in_ipc_op)) {
+		/* `p` may still be in the rec part of the SENDREC leading to
+		 * this call. Thus it's RTS flags may not be set yet, in this
+		 * case also check the p_in_ipc_op. If `p is not in an ipc
+		 * operation then we have a problem. */
 		printf("WARNINIG: setting full context of runnable process\n");
 		print_proc(p);
 		util_stacktrace();
