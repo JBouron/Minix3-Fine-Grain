@@ -2359,12 +2359,11 @@ void sink(void)
 
 void _rts_set(struct proc *p,int flag)
 {
-	const int rts = p->p_rts_flags;
 	p->p_rts_flags |= (flag);
 	p->__gdb_last_cpu_flag = cpuid;
 	p->__gdb_line = __LINE__;
 	p->__gdb_file = __FILE__;
-	if(rts_f_is_runnable(rts) && !proc_is_runnable(p)) {
+	if(!proc_is_runnable(p)&&p->p_enqueued) {
 		if(cpuid!=p->p_cpu)
 			smp_dequeue_task(p);
 		else
