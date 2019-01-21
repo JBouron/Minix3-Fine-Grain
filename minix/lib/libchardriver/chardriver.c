@@ -104,13 +104,6 @@ void chardriver_announce(void)
   char label[DS_MAX_KEYLEN];
   const char *driver_prefix = "drv.chr.";
 
-  /* Callers are allowed to use ipc_sendrec to communicate with drivers.
-   * For this reason, there may blocked callers when a driver restarts.
-   * Ask the kernel to unblock them (if any).
-   */
-  if ((r = sys_statectl(SYS_STATE_CLEAR_IPC_REFS, 0, 0)) != OK)
-	panic("chardriver_announce: sys_statectl failed: %d", r);
-
   /* Publish a driver up event. */
   if ((r = ds_retrieve_label_name(label, sef_self())) != OK)
 	panic("chardriver_announce: unable to get own label: %d", r);
