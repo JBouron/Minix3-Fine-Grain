@@ -1536,9 +1536,6 @@ int try_deliver_senda(struct proc *caller_ptr,
 
   privp = priv(caller_ptr);
 
-  /* Clear table */
-  privp->s_asyntab = -1;
-  privp->s_asynsize = 0;
   privp->s_asynendpoint = caller_ptr->p_endpoint;
 
   if (size == 0) return(OK);  /* Nothing to do, just return */
@@ -1565,11 +1562,45 @@ int try_deliver_senda(struct proc *caller_ptr,
 
 	dst = NONE;
 	/* Copy message to kernel */
+retry:
 	A_RETR(i);
 	flags = tabent.flags;
 	dst = tabent.dst;
 
-	if (flags == 0) continue; /* Skip empty entries */
+	if (isokendpt(tabent.dst, &dst_p))
+		dst_ptr = proc_addr(dst_p);
+	else
+		dst_ptr = NULL;
+
+	/* Here's some explaination on the trickery that will follow.
+	 * Here we are trying to deliver a message from caller_ptr to dst_ptr.
+	 * Because we need the locks on both, we have to re-acquire the lock
+	 * on the caller to ensure the lock ordering.
+	 * However in the meantime, dst_ptr might be running try_one with the
+	 * caller_ptr as the source, which mean we can have a race condition on
+	 * the message i.
+	 * To avoid this, retreive the message i again after re-acquiring the
+	 * locks and check that the flags haven't changed in the meantime.
+	 * If they did then it means that the try_one beat us and thus retry.
+	 */
+	if(lock) {
+		unlock_proc(caller_ptr);
+		lock_two_procs(caller_ptr,dst_ptr);
+	}
+
+	A_RETR(i);
+	if(tabent.flags!=flags) {
+		/* Some one beat us to it, retry. */
+		if(lock)
+			unlock_proc(dst_ptr);
+		goto retry;
+	}
+
+	if (flags == 0) {
+		if(lock)
+			unlock_proc(dst_ptr);
+		continue;
+	}
 
 	/* 'flags' field must contain only valid bits */
 	if(flags & ~(AMF_VALID|AMF_DONE|AMF_NOTIFY|AMF_NOREPLY|AMF_NOTIFY_ERR)) {
@@ -1580,7 +1611,11 @@ int try_deliver_senda(struct proc *caller_ptr,
 		r = EINVAL;
 		goto asyn_error;
 	}
-	if (flags & AMF_DONE) continue;	/* Already done processing */
+	if (flags & AMF_DONE) {
+		if(lock)
+			unlock_proc(dst_ptr);
+		continue;
+	}
 
 	r = OK;
 	if (!isokendpt(tabent.dst, &dst_p)) 
@@ -1591,11 +1626,6 @@ int try_deliver_senda(struct proc *caller_ptr,
 		r = ECALLDENIED; /* Send denied by IPC mask */
 	else 	/* r == OK */
 		dst_ptr = proc_addr(dst_p);
-
-	if(lock) {
-		unlock_proc(caller_ptr);
-		lock_two_procs(caller_ptr,dst_ptr);
-	}
 
 	/* XXX: RTS_NO_ENDPOINT should be removed */
 	if (r == OK && RTS_ISSET(dst_ptr, RTS_NO_ENDPOINT)) {
@@ -1663,6 +1693,9 @@ asyn_error:
   if (!done) {
 	privp->s_asyntab = (vir_bytes) table;
 	privp->s_asynsize = size;
+  } else {
+	  privp->s_asyntab = -1;
+	  privp->s_asynsize = 0;
   }
 
   return(OK);
