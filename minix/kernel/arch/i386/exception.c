@@ -83,8 +83,10 @@ static void pagefault( struct proc *pr,
 			}
 		}
 		else {
+			lock_proc(pr);
 			pr->p_reg.pc = (reg_t) phys_copy_fault;
 			pr->p_reg.retreg = pagefaultcr2;
+			unlock_proc(pr);
 		}
 	
 		return;
@@ -111,6 +113,8 @@ static void pagefault( struct proc *pr,
 
 		return;
 	}
+	struct proc *vm = proc_addr(VM_PROC_NR);
+	lock_two_procs(pr,vm);
 
 	/* Don't schedule this process until pagefault is handled. */
 	RTS_SET(pr, RTS_PAGEFAULT);
@@ -127,6 +131,7 @@ static void pagefault( struct proc *pr,
 					&m_pagefault, FROM_KERNEL))) {
 		panic("WARNING: pagefault: mini_send returned %d\n", err);
 	}
+	unlock_two_procs(pr,vm);
 
 	return;
 }
@@ -253,8 +258,8 @@ void exception_handler(int is_nested, struct exception_frame * frame)
   }
 
   if(frame->vector == PAGE_FAULT_VECTOR) {
-	pagefault(saved_proc, frame, is_nested);
-	return;
+	  pagefault(saved_proc, frame, is_nested);
+	  return;
   }
 
   /* If an exception occurs while running a process, the is_nested variable

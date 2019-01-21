@@ -359,7 +359,6 @@ exception_entry_from_user:
 	/* for stack trace clear %ebp */
 	movl	$0, %ebp
 	call	_C_LABEL(context_stop)
-	call	_C_LABEL(bkl_lock)
 	add	$4, %esp
 
 	/*
@@ -370,7 +369,6 @@ exception_entry_from_user:
 	push	%esp
 	push	$0	/* it's not a nested exception */
 	call 	_C_LABEL(exception_handler)
-	call	_C_LABEL(bkl_unlock)
 
 	jmp	_C_LABEL(switch_to_user)
 
