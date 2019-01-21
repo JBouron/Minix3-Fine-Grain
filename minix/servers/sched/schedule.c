@@ -184,12 +184,7 @@ int do_start_scheduling(message *m_ptr)
 		return EINVAL;
 	}
 
-	/* The system processes will run on the BSP cpu only during boot. */
-	if(is_system_proc(rmp)) {
-		restrict_to_bsp(rmp);
-	} else {
-		allow_all_cpus(rmp);
-	}
+	allow_all_cpus(rmp);
 
 	cpu_chosen = 0;
 	/* Inherit current priority and time slice from parent. Since there
@@ -409,6 +404,7 @@ void balance_queues(void)
 			}
 		}
 	}
+	print_loads_summary();
 
 	if ((r = sys_setalarm(balance_timeout, 0)) != OK)
 		panic("sys_setalarm failed: %d", r);

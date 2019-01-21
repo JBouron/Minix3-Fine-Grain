@@ -25,6 +25,7 @@ static struct sched_ipi_data  sched_ipi_data[CONFIG_MAX_CPUS];
 #define SCHED_IPI_VM_INHIBIT	2
 #define SCHED_IPI_SAVE_CTX	4
 #define SCHED_IPI_DEQUEUE	8
+#define SCHED_IPI_MIGRATE	16
 
 static volatile unsigned ap_cpus_booted;
 
@@ -161,12 +162,13 @@ void smp_schedule_migrate_proc(struct proc * p, unsigned dest_cpu)
 	 * stop the processes and force the complete context of the process to
 	 * be saved (i.e. including FPU state and such)
 	 */
-	smp_schedule_sync(p, SCHED_IPI_STOP_PROC | SCHED_IPI_SAVE_CTX);
-	assert(RTS_ISSET(p, RTS_PROC_STOP));
-	
-	/* assign the new cpu and let the process run again */
-	p->p_cpu = dest_cpu;
-	RTS_UNSET(p, RTS_PROC_STOP);
+	assert(proc_locked(p));
+	/* The proc should not be in a middle of a migration already. */
+	assert(!(p->p_rts_flags&RTS_PROC_MIGR));
+	assert(p->p_cpu!=cpuid);
+	assert(p->p_cpu!=dest_cpu);
+	p->p_next_cpu = dest_cpu;
+	smp_schedule_sync(p,SCHED_IPI_MIGRATE);
 }
 
 void smp_dequeue_task(struct proc *p)
@@ -208,6 +210,29 @@ void smp_sched_handler(void)
 		if (flgs&SCHED_IPI_DEQUEUE) {
 			assert(p->p_cpu==cpuid);
 			dequeue(p);
+		}
+		if (flgs&SCHED_IPI_MIGRATE) {
+			assert(p->p_lock.lock.val);
+			assert(p->p_cpu==cpu);
+			if(get_cpu_var(cpu,proc_ptr)==p) {
+				/* This proc might be in the middle of it's
+				 * user timeslice or in a kernel operation.
+				 * Thus let it finish and defer the migration
+				 * until the switch_to_user by setting the
+				 * RTS_PROC_MIGR flag. */
+				assert(p->p_next_cpu!=cpu);
+				assert(p->p_next_cpu!=-1);
+				RTS_SET(p,RTS_PROC_MIGR);
+			} else {
+				/* This proc is either not runnable, or
+				 * waiting in this cpu's ready queue.
+				 * Either way it is not currently running
+				 * and thus we can safely migrate it now. */
+				RTS_SET(p,RTS_PROC_MIGR);
+				p->p_cpu = p->p_next_cpu;
+				p->p_next_cpu = -1;
+				RTS_UNSET(p,RTS_PROC_MIGR);
+			}
 		}
 	}
 

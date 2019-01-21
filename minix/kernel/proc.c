@@ -150,6 +150,7 @@ void proc_init(void)
 		rp->p_enqueued = 0;		/* Proc's not enqueued yet. */
 		rp->p_deliver_type = MSG_TYPE_NULL;	/* No message received yet. */
 		rp->p_sendto_e = NONE;		/* Proc's not blocked sending. */
+		rp->p_next_cpu = -1;
 
 		/* arch-specific initialization */
 		arch_proc_reset(rp);
@@ -347,7 +348,14 @@ not_runnable_pick_new:
 	 * enqueue below, because the proc_ptr is set to `p` at this point. */
 	handle_all_deferred_sigs();
 
-	if (proc_is_preempted(p)) {
+	if (proc_is_migrating(p)) {
+		/* Somebody wants to migrate this process. now that its
+		 * time-slice or kernel operation is over we can migrate it. */
+		p->p_cpu = p->p_next_cpu;
+		p->p_next_cpu = -1;
+		/* Enqueue p on its new cpu. */
+		RTS_UNSET(p,RTS_PROC_MIGR);
+	} else if (proc_is_preempted(p)) {
 		p->p_rts_flags &= ~RTS_PREEMPTED;
 		if (proc_is_runnable(p)) {
 			if (p->p_cpu_time_left)
@@ -2094,6 +2102,7 @@ void dequeue(struct proc *rp)
 
   /* We don't allow remote dequeues anymore. Use IPI instead. */
   assert(cpuid==rp->p_cpu);
+  assert(rp->p_enqueued);
 
   /* Side-effect for kernel: check if the task's stack still is ok? */
   assert (!iskernelp(rp) || *priv(rp)->s_stack_guard == STACK_GUARD);
@@ -2106,6 +2115,7 @@ void dequeue(struct proc *rp)
    * running by being sent a signal that kills it.
    */
   prev_xp = NULL;				
+  int found = 0;
   for (xpp = get_cpu_var_ptr(rp->p_cpu, run_q_head[q]); *xpp;
 		  xpp = &(*xpp)->p_nextready) {
       if (*xpp == rp) {				/* found process to remove */
@@ -2113,12 +2123,13 @@ void dequeue(struct proc *rp)
           if (rp == rdy_tail[q]) {		/* queue tail removed */
               rdy_tail[q] = prev_xp;		/* set new tail */
 	  }
-
+	  found = 1;
           break;
       }
       prev_xp = *xpp;				/* save previous in chain */
   }
   unlock_runqueues(rp->p_cpu);
+  assert(found);
 
   rp->p_enqueued = 0;
 

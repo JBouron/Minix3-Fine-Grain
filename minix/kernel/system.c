@@ -763,39 +763,42 @@ int sched_proc(struct proc *p, int priority, int quantum, int cpu, int niced)
 
 	/* FIXME this preempts the process, do we really want to do that ?*/
 
-	/* FIXME this is a problem for SMP if the processes currently runs on a
-	 * different CPU */
-	if (proc_is_runnable(p)) {
-#ifdef CONFIG_SMP
-		if (p->p_cpu != cpuid && cpu != -1 && cpu != p->p_cpu) {
-			smp_schedule_migrate_proc(p, cpu);
-		}
-#endif
-
-		RTS_SET(p, RTS_NO_QUANTUM);
-	}
-
-	if (proc_is_runnable(p))
-		RTS_SET(p, RTS_NO_QUANTUM);
-
+	/* Take care of priority / quantum / nice changes first. */
+	// TODO: Modifying the prio implies a remote deque, which is inefficient.
+	if(priority!=-1||quantum!=-1)
+		RTS_SET(p,RTS_NO_QUANTUM);
 	if (priority != -1)
 		p->p_priority = priority;
 	if (quantum != -1) {
 		p->p_quantum_size_ms = quantum;
 		p->p_cpu_time_left = ms_2_cpu_time(quantum);
 	}
-#ifdef CONFIG_SMP
-	if (cpu != -1)
-		p->p_cpu = cpu;
-#endif
 
 	if (niced)
 		p->p_misc_flags |= MF_NICED;
 	else
 		p->p_misc_flags &= ~MF_NICED;
 
-	/* Clear the scheduling bit and enqueue the process */
-	RTS_UNSET(p, RTS_NO_QUANTUM);
+	/* Is this call going to migrate the proc ? */
+	const int migrate_proc = cpu!=-1&&p->p_cpu!=cpu;
+	if(migrate_proc) {
+		if(p->p_cpu==cpuid) {
+			/* We are responsible for this proc. We know that the
+			 * proc is not currently running (because the scheduler
+			 * proc is), thus simply change it's p_cpu field. Use
+			 * the RTS_PROC_MIGR flag to trigger the
+			 * dequeue-enqueue. */
+			assert(get_cpulocal_var(proc_ptr)!=p);
+			RTS_SET(p,RTS_PROC_MIGR);
+			p->p_cpu = cpu;
+			RTS_UNSET(p,RTS_PROC_MIGR);
+		} else {
+			/* This proc is owned by another cpu, let it handle the
+			 * migration for us. */
+			smp_schedule_migrate_proc(p,cpu);
+		}
+	}
+	RTS_UNSET(p,RTS_NO_QUANTUM);
 
 	return OK;
 }

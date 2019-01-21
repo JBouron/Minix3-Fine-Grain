@@ -33,6 +33,7 @@ struct proc {
   int p_deliver_type;		/* What kind of message has been delivered ? */
   int p_new_message;		/* Has the process received a new message ? */
   int p_in_ipc_op;		/* Is this process running IPC code in kernel ? */
+  int p_next_cpu;		/* To schedule migrations. */
 
   int __gdb_last_cpu_flag;
   int __gdb_line;
@@ -176,6 +177,7 @@ struct proc {
 				   should be enqueued at the end of some run
 				   queue again */
 #define RTS_BOOTINHIBIT	0x10000	/* not ready until VM has made it */
+#define RTS_PROC_MIGR	0x20000	/* Not ready until migration is done. */
 
 /* Values for the p_deliver_type field. */
 #define MSG_TYPE_NULL		0x0	/* No message. */
@@ -188,6 +190,7 @@ struct proc {
 #define proc_is_runnable(p)	(rts_f_is_runnable((p)->p_rts_flags))
 
 #define proc_is_preempted(p)	((p)->p_rts_flags & RTS_PREEMPTED)
+#define proc_is_migrating(p)	((p)->p_rts_flags & RTS_PROC_MIGR)
 #define proc_no_quantum(p)	((p)->p_rts_flags & RTS_NO_QUANTUM)
 #define proc_ptr_ok(p)		((p)->p_magic == PMAGIC)
 #define proc_used_fpu(p)	((p)->p_misc_flags & (MF_FPU_INITIALIZED))
@@ -288,7 +291,7 @@ struct proc {
 
 #define isokprocn(n)      ((unsigned) ((n) + NR_TASKS) < NR_PROCS + NR_TASKS)
 #define isemptyn(n)       isemptyp(proc_addr(n)) 
-#define isemptyp(p)       ((p)->p_rts_flags == RTS_SLOT_FREE)
+#define isemptyp(p)       ((p)->p_rts_flags&RTS_SLOT_FREE)
 #define iskernelp(p)	  ((p) < BEG_USER_ADDR)
 #define iskerneln(n)	  ((n) < 0)
 #define isuserp(p)        isusern((p) >= BEG_USER_ADDR)
