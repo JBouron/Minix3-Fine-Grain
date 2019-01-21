@@ -404,7 +404,6 @@ void balance_queues(void)
 			}
 		}
 	}
-	print_loads_summary();
 
 	if ((r = sys_setalarm(balance_timeout, 0)) != OK)
 		panic("sys_setalarm failed: %d", r);
