@@ -2815,7 +2815,6 @@ static inline int _ipc_sendrec(endpoint_t src_dest, message *m_ptr)
 static inline int _ipc_sendnb(endpoint_t dest, message *m_ptr)
 {
 	int tries,max_tries,res;
-
 	max_tries = 64;
 #define ENOTREADY -201 /* Re-def it here. Hack. */
 	res = ENOTREADY;
