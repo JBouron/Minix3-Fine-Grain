@@ -61,16 +61,6 @@ void __gdb_bkl_unlock(spinlock_t *lock, int cpu) {
 	fill_stack_trace(lock->unlock_stack_trace, ebp, SPINLOCK_MAX_STACK_DEPTH);
 }
 
-void bkl_lock(void)
-{
-       BKL_LOCK();
-}
-
-void bkl_unlock(void)
-{
-       BKL_UNLOCK();
-}
-
 static int bkl_owner = -1;
 static int bkl_acq_count = 0;
 int bkl_line = 0;

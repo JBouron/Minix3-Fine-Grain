@@ -2368,6 +2368,7 @@ void copr_not_available_handler(void)
 	disable_fpu_exception();
 
 	p = get_cpulocal_var(proc_ptr);
+	lock_proc(p);
 
 	/* if FPU is not owned by anyone, do not store anything */
 	local_fpu_owner = get_cpulocal_var_ptr(fpu_owner);
@@ -2386,11 +2387,12 @@ void copr_not_available_handler(void)
 		 */
 		*local_fpu_owner = NULL;		/* release FPU */
 		cause_sig_deferred(proc_nr(p), SIGFPE);
+		unlock_proc(p);
 		return;
 	}
 
 	*local_fpu_owner = p;
-	BKL_UNLOCK();
+	unlock_proc(p);
 	context_stop(proc_addr(KERNEL));
 	restore_user_context(p);
 	NOT_REACHABLE;
