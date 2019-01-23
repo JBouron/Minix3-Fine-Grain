@@ -192,8 +192,12 @@ void smp_sched_handler(void)
 		struct proc * p;
 		p = (struct proc *)sched_ipi_data[cpu].data;
 
+		/* The cpu triggering this NMI must always have the lock on the
+		 * proc. */
+		assert(proc_locked_borrow(p));
+
 		if (flgs & SCHED_IPI_STOP_PROC) {
-			RTS_SET(p, RTS_PROC_STOP);
+			RTS_SET_BORROW(p, RTS_PROC_STOP);
 		}
 		if (flgs & SCHED_IPI_SAVE_CTX) {
 			/* all context has been saved already, FPU remains */
@@ -206,14 +210,13 @@ void smp_sched_handler(void)
 			}
 		}
 		if (flgs & SCHED_IPI_VM_INHIBIT) {
-			RTS_SET(p, RTS_VMINHIBIT);
+			RTS_SET_BORROW(p, RTS_VMINHIBIT);
 		}
 		if (flgs&SCHED_IPI_DEQUEUE) {
 			assert(p->p_cpu==cpuid);
 			dequeue(p);
 		}
 		if (flgs&SCHED_IPI_MIGRATE) {
-			assert(p->p_lock.lock.val);
 			assert(p->p_cpu==cpu);
 			if(get_cpu_var(cpu,proc_ptr)==p) {
 				/* This proc might be in the middle of it's
@@ -223,16 +226,16 @@ void smp_sched_handler(void)
 				 * RTS_PROC_MIGR flag. */
 				assert(p->p_next_cpu!=cpu);
 				assert(p->p_next_cpu!=-1);
-				RTS_SET(p,RTS_PROC_MIGR);
+				RTS_SET_BORROW(p,RTS_PROC_MIGR);
 			} else {
 				/* This proc is either not runnable, or
 				 * waiting in this cpu's ready queue.
 				 * Either way it is not currently running
 				 * and thus we can safely migrate it now. */
-				RTS_SET(p,RTS_PROC_MIGR);
+				RTS_SET_BORROW(p,RTS_PROC_MIGR);
 				p->p_cpu = p->p_next_cpu;
 				p->p_next_cpu = -1;
-				RTS_UNSET(p,RTS_PROC_MIGR);
+				RTS_UNSET_BORROW(p,RTS_PROC_MIGR);
 			}
 		}
 	}

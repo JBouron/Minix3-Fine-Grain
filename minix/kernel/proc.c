@@ -344,12 +344,18 @@ void switch_to_user(void)
 	 * current process wasn't runnable, we pick a new one here
 	 */
 not_runnable_pick_new:
-	unlock_proc(p);
-	/* If we end up here after a resumed kernel call or a delivermsg,
-	 * handle the signals if any. We need to do this before the potential
-	 * enqueue below, because the proc_ptr is set to `p` at this point. */
-	handle_all_deferred_sigs();
+        /* If we end up here after a resumed kernel call or a delivermsg,
+         * handle the signals if any. We need to do this before the potential
+         * enqueue below, because the proc_ptr is set to `p` at this point.
+	 * This explanation sucks, all I know is the deferred sigs must be
+	 * sent *before* the potential enqueue, but I don't remember why :/ */
+	if(get_cpulocal_var(sigbuffer_count)>0) {
+		unlock_proc(p);
+		handle_all_deferred_sigs();
+		lock_proc(p);
+	}
 
+	assert(proc_locked(p));
 	if (proc_is_migrating(p)) {
 		/* Somebody wants to migrate this process. now that its
 		 * time-slice or kernel operation is over we can migrate it. */
@@ -366,6 +372,13 @@ not_runnable_pick_new:
 				enqueue(p);
 		}
 	}
+
+	/* Set the proc_ptr to the idle proc. That way if we receive a migrate
+	 * NMI request after exiting the while loop below, but before changing
+	 * proc_ptr, the cpu will not mistakenly use the "old" value of
+	 * proc_ptr in smp_sched_handler. */
+	get_cpulocal_var(proc_ptr) = get_cpulocal_var_ptr(idle_proc);
+	unlock_proc(p);
 
 	lock_runqueues(cpuid);
 
@@ -389,6 +402,7 @@ not_runnable_pick_new:
 	unlock_runqueues(cpuid);
 
 	lock_proc(p);
+	assert(p->p_cpu==cpuid);
 	if(!proc_is_runnable(p)) {
 		goto not_runnable_pick_new;
 	}
@@ -2046,7 +2060,7 @@ void enqueue(
 	  assert(p);
 	  if((p->p_priority > rp->p_priority) &&
 			  (priv(p)->s_flags & PREEMPTIBLE))
-		  RTS_SET(p, RTS_PREEMPTED); /* calls dequeue() */
+		  RTS_SET_UNSAFE(p, RTS_PREEMPTED); /* calls dequeue() */
   }
 #ifdef CONFIG_SMP
   /*
@@ -2432,8 +2446,12 @@ void sink(void)
 	/* Do nothing. */
 }
 
-void _rts_set(struct proc *p,int flag)
+void _rts_set(struct proc *p,int flag,int lockflag)
 {
+	if(lockflag==1)
+		assert(proc_locked_borrow(p));
+	else if(lockflag==2)
+		assert(proc_locked(p));
 	p->p_rts_flags |= (flag);
 	p->__gdb_last_cpu_flag = cpuid;
 	p->__gdb_line = __LINE__;
@@ -2447,9 +2465,13 @@ void _rts_set(struct proc *p,int flag)
 	assert(!p->p_enqueued);
 }
 
-void _rts_unset(struct proc *p,int flag)
+void _rts_unset(struct proc *p,int flag,int lockflag)
 {
 	int rts;
+	if(lockflag==1)
+		assert(proc_locked_borrow(p));
+	else if(lockflag==2)
+		assert(proc_locked(p));
 	rts = p->p_rts_flags;
 	p->p_rts_flags &= ~(flag);
 	p->__gdb_last_cpu_flag = cpuid;
@@ -2462,6 +2484,7 @@ void _rts_unset(struct proc *p,int flag)
 
 void _rts_setflags(struct proc *p,int flag)
 {
+	assert(proc_locked(p));
 	p->p_rts_flags = (flag);
 	if(proc_is_runnable(p) && (flag)) {
 		if(cpuid!=p->p_cpu)
@@ -2495,6 +2518,11 @@ void unlock_proc(struct proc *p)
 int proc_locked(struct proc *p)
 {
 	return p->p_lock.lock.val==1&&p->p_lock.owner==cpuid;
+}
+
+int proc_locked_borrow(struct proc *p)
+{
+	return p->p_lock.lock.val==1&&p->p_lock.owner!=cpuid;
 }
 
 void lock_two_procs(struct proc *p1,struct proc *p2)

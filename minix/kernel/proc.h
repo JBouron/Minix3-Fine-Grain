@@ -226,7 +226,7 @@ struct proc {
 /* Set flag and dequeue if the process was runnable. */
 #define RTS_SET(rp, f) \
 	do { \
-		_rts_set(rp,f); \
+		_rts_set(rp,f,2); \
 		rp->__gdb_last_cpu_flag = cpuid; \
 		rp->__gdb_line = __LINE__; \
 		rp->__gdb_file = __FILE__; \
@@ -235,7 +235,40 @@ struct proc {
 /* Clear flag and enqueue if the process was not runnable but is now. */
 #define RTS_UNSET(rp, f) \
 	do { \
-		_rts_unset(rp,f); \
+		_rts_unset(rp,f,2); \
+		rp->__gdb_last_cpu_flag = cpuid; \
+		rp->__gdb_line = __LINE__; \
+		rp->__gdb_file = __FILE__; \
+	}while(0)
+
+#define RTS_SET_BORROW(rp, f) \
+	do { \
+		_rts_set(rp,f,1); \
+		rp->__gdb_last_cpu_flag = cpuid; \
+		rp->__gdb_line = __LINE__; \
+		rp->__gdb_file = __FILE__; \
+	}while(0)
+
+/* Clear flag and enqueue if the process was not runnable but is now. */
+#define RTS_UNSET_BORROW(rp, f) \
+	do { \
+		_rts_unset(rp,f,1); \
+		rp->__gdb_last_cpu_flag = cpuid; \
+		rp->__gdb_line = __LINE__; \
+		rp->__gdb_file = __FILE__; \
+	}while(0)
+
+#define RTS_SET_UNSAFE(rp, f) \
+	do { \
+		_rts_set(rp,f,0); \
+		rp->__gdb_last_cpu_flag = cpuid; \
+		rp->__gdb_line = __LINE__; \
+		rp->__gdb_file = __FILE__; \
+	}while(0)
+
+#define RTS_UNSET_UNSAFE(rp, f) \
+	do { \
+		_rts_unset(rp,f,0); \
 		rp->__gdb_last_cpu_flag = cpuid; \
 		rp->__gdb_line = __LINE__; \
 		rp->__gdb_file = __FILE__; \
@@ -309,14 +342,19 @@ int mini_send_no_lock(struct proc *caller_ptr, endpoint_t dst_e, message *m_ptr,
 int mini_send(struct proc *caller_ptr, endpoint_t dst_e, message *m_ptr,
 	int flags);
 
-void _rts_set(struct proc *p,int flag);
-void _rts_unset(struct proc *p,int flag);
+/* The `lockflag` flag indicates what assertion should be tested against the
+ * proc lock state. 1 => proc is locked by a remote cpu, 2 => proc is locked
+ * by this cpu 0 => no assert (UNSAFE!).
+ */
+void _rts_set(struct proc *p,int flag,int lockflag);
+void _rts_unset(struct proc *p,int flag,int lockflag);
 void _rts_setflags(struct proc *p,int flag);
 
 void lock_proc(struct proc *p);
 void unlock_proc(struct proc *p);
 
 int proc_locked(struct proc *p);
+int proc_locked_borrow(struct proc *p);
 
 void lock_two_procs(struct proc *p1,struct proc *p2);
 void unlock_two_procs(struct proc *p1,struct proc *p2);
