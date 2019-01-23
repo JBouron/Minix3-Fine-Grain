@@ -81,10 +81,12 @@ void lock_all_procs(void)
 
 void unlock_all_procs(void)
 {
-	int p,nprocs;
+	int p,nprocs,cpu;
+	cpu = cpuid;
 	bkl_owner = -1;
 	nprocs = sizeof(proc)/sizeof(struct proc);
 	for(p=0;p<nprocs;++p) {
+		assert(proc[p].p_lock.owner==cpu);
 		proc[p].p_lock.owner = -1;
 		spinlock_unlock(&(proc[p].p_lock.lock));
 	}

@@ -174,6 +174,7 @@ void smp_schedule_migrate_proc(struct proc * p, unsigned dest_cpu)
 void smp_dequeue_task(struct proc *p)
 {
 	assert(p->p_enqueued);
+	assert(proc_locked(p));
 	smp_schedule_sync(p,SCHED_IPI_DEQUEUE);
 }
 

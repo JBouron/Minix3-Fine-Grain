@@ -330,6 +330,7 @@ void switch_to_user(void)
 	handle_all_deferred_sigs();
 
 	p = get_cpulocal_var(proc_ptr);
+	lock_proc(p);
 
 	/*
 	 * if the current process is still runnable check the misc flags and let
@@ -343,6 +344,7 @@ void switch_to_user(void)
 	 * current process wasn't runnable, we pick a new one here
 	 */
 not_runnable_pick_new:
+	unlock_proc(p);
 	/* If we end up here after a resumed kernel call or a delivermsg,
 	 * handle the signals if any. We need to do this before the potential
 	 * enqueue below, because the proc_ptr is set to `p` at this point. */
@@ -386,6 +388,11 @@ not_runnable_pick_new:
 	}
 	unlock_runqueues(cpuid);
 
+	lock_proc(p);
+	if(!proc_is_runnable(p)) {
+		goto not_runnable_pick_new;
+	}
+
 	/* update the global variable */
 	get_cpulocal_var(proc_ptr) = p;
 
@@ -396,13 +403,6 @@ not_runnable_pick_new:
 	switch_address_space(p);
 
 check_misc_flags:
-
-	BKL_LOCK();
-	if(!proc_is_runnable(p)) {
-		/* Something happened in the lock re-acquisition, retry. */
-		BKL_UNLOCK();
-		goto not_runnable_pick_new;
-	}
 
 	assert(proc_is_runnable(p));
 
@@ -419,6 +419,7 @@ check_misc_flags:
 		assert(proc_is_runnable(p));
 		if (p->p_misc_flags & MF_KCALL_RESUME) {
 			kernel_call_resume(p);
+			lock_proc(p);
 		}
 		else if (p->p_misc_flags & MF_DELIVERMSG) {
 			TRACE(VF_SCHEDULING, printf("delivering to %s / %d\n",
@@ -431,7 +432,6 @@ check_misc_flags:
 		 * to checkit and schedule another one
 		 */
 		if (!proc_is_runnable(p)) {
-			BKL_UNLOCK();
 			goto not_runnable_pick_new;
 		}
 	}
@@ -443,20 +443,17 @@ check_misc_flags:
 	 */
 	if (!p->p_cpu_time_left)
 		proc_no_time(p);
-	/*
-	 * After handling the misc flags the selected process might not be
-	 * runnable anymore. We have to checkit and schedule another one
-	 */
-	if (!proc_is_runnable(p)) {
-		BKL_UNLOCK();
-		goto not_runnable_pick_new;
-	}
-	BKL_UNLOCK();
 
-	/* Check one last time. */
-	handle_all_deferred_sigs();
+	if(get_cpulocal_var(sigbuffer_count)>0) {
+		unlock_proc(p);
+		handle_all_deferred_sigs();
+		lock_proc(p);
+	}
+
 	if (!proc_is_runnable(p)) {
 		goto not_runnable_pick_new;
+	} else {
+		unlock_proc(p);
 	}
 
 	TRACE(VF_SCHEDULING, printf("cpu %d starting %s / %d "
@@ -2298,6 +2295,9 @@ static void notify_scheduler(struct proc *p)
 	message m_no_quantum;
 	int err;
 
+	assert(proc_locked(p));
+	assert(proc_locked(p->p_scheduler));
+
 	assert(!proc_kernel_scheduler(p));
 
 	/* dequeue the process */
@@ -2329,9 +2329,17 @@ static void notify_scheduler(struct proc *p)
 
 void proc_no_time(struct proc * p)
 {
+	assert(proc_locked(p));
 	if (!proc_kernel_scheduler(p) && priv(p)->s_flags & PREEMPTIBLE) {
 		/* this dequeues the process */
-		notify_scheduler(p);
+		unlock_proc(p);
+		lock_two_procs(p,p->p_scheduler);
+		/* Re-check the condition, it might have changed in the meantime
+		 */
+		if(!p->p_cpu_time_left)
+			notify_scheduler(p);
+		/* Keep the lock on p for switch_to_user. */
+		unlock_proc(p->p_scheduler);
 	}
 	else {
 		/*
@@ -2479,6 +2487,7 @@ void unlock_proc(struct proc *p)
 	if(!p)
 		return;
 	/* For now we bypass the reentrant locks. */
+	assert(p->p_lock.owner==cpuid);
 	p->p_lock.owner = -1;
 	spinlock_unlock(&(p->p_lock.lock));
 }

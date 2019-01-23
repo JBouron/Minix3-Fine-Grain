@@ -58,6 +58,7 @@ static int (*call_vec[NR_SYS_CALLS])(struct proc * caller, message *m_ptr);
 
 static void kernel_call_finish(struct proc * caller, message *msg, int result)
 {
+  assert(proc_locked(caller));
   if(result == VMSUSPEND) {
 	  /* Special case: message has to be saved for handling
 	   * until VM tells us it's allowed. VM has been notified
@@ -90,6 +91,7 @@ static void kernel_call_finish(struct proc * caller, message *msg, int result)
 		  }
 	  }
   }
+  BKL_UNLOCK();
 }
 
 static int kernel_call_dispatch(struct proc * caller, message *msg)
@@ -115,6 +117,7 @@ static int kernel_call_dispatch(struct proc * caller, message *msg)
 	  result = ECALLDENIED;			/* illegal message type */
   } else {
 	  /* handle the system call */
+	  BKL_LOCK();
 	  if (call_vec[call_nr])
 		  result = (*call_vec[call_nr])(caller, msg);
 	  else {
@@ -122,6 +125,7 @@ static int kernel_call_dispatch(struct proc * caller, message *msg)
 				  call_nr, caller->p_endpoint);
 		  result = EBADREQUEST;
 	  }
+	  /* The BKL_UNLOCK will be done in kernel_call_finish. */
   }
 
   return result;
@@ -139,8 +143,6 @@ void kernel_call(message *m_user, struct proc * caller)
   int result = OK;
   message msg;
 
-  BKL_LOCK();
-
   caller->p_delivermsg_vir = (vir_bytes) m_user;
   /*
    * the ldt and cr3 of the caller process is loaded because it just've trapped
@@ -155,7 +157,6 @@ void kernel_call(message *m_user, struct proc * caller)
 	  printf("WARNING wrong user pointer 0x%08x from process %s / %d\n",
 			  m_user, caller->p_name, caller->p_endpoint);
 	  cause_sig_deferred(proc_nr(caller), SIGSEGV);
-	  BKL_UNLOCK();
 	  return;
   }
 
@@ -164,7 +165,6 @@ void kernel_call(message *m_user, struct proc * caller)
   get_cpulocal_var(bill_kcall) = caller;
 
   kernel_call_finish(caller, &msg, result);
-  BKL_UNLOCK();
 }
 
 /*===========================================================================*
@@ -728,6 +728,7 @@ void kernel_call_resume(struct proc *caller)
 	/* re-execute the kernel call, with MF_KCALL_RESUME still set so
 	 * the call knows this is a retry.
 	 */
+	unlock_proc(caller);
 	result = kernel_call_dispatch(caller, &caller->p_vmrequest.saved.reqmsg);
 	/*
 	 * we are resuming the kernel call so we have to remove this flag so it
