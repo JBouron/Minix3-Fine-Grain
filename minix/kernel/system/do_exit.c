@@ -20,6 +20,7 @@ int do_exit(struct proc * caller, message * m_ptr)
 
   cause_sig_deferred(caller->p_nr, sig_nr);      /* send a signal to the caller */
 
+  lock_proc(caller);
   return(EDONTREPLY);			/* don't reply */
 }
 

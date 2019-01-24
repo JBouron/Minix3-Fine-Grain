@@ -34,12 +34,15 @@ int do_times(struct proc * caller, message * m_ptr)
       caller->p_endpoint : m_ptr->m_lsys_krn_sys_times.endpt;
   if(e_proc_nr != NONE && isokendpt(e_proc_nr, &proc_nr)) {
       rp = proc_addr(proc_nr);
+      /* There's little point in taking the lock on rp here. */
       m_ptr->m_krn_lsys_sys_times.user_time   = rp->p_user_time;
       m_ptr->m_krn_lsys_sys_times.system_time = rp->p_sys_time;
   }
   m_ptr->m_krn_lsys_sys_times.boot_ticks = get_monotonic();
   m_ptr->m_krn_lsys_sys_times.real_ticks = get_realtime();
   m_ptr->m_krn_lsys_sys_times.boot_time = get_boottime();
+
+  lock_proc(caller);
   return(OK);
 }
 

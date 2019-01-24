@@ -24,17 +24,24 @@ int do_kill(struct proc * caller, message * m_ptr)
  */
   proc_nr_t proc_nr, proc_nr_e;
   int sig_nr = m_ptr->m_sigcalls.sig;
+  int res;
 
   proc_nr_e = (proc_nr_t)m_ptr->m_sigcalls.endpt;
 
-  if (!isokendpt(proc_nr_e, &proc_nr)) return(EINVAL);
-  if (sig_nr >= _NSIG) return(EINVAL);
-  if (iskerneln(proc_nr)) return(EPERM);
+  if (!isokendpt(proc_nr_e, &proc_nr)) {
+	  res = (EINVAL);
+  } else if (sig_nr >= _NSIG) {
+	  res = (EINVAL);
+  } else if (iskerneln(proc_nr)) {
+	  res = (EPERM);
+  } else {
+	  /* Set pending signal to be processed by the signal manager. */
+	  cause_sig_deferred(proc_nr, sig_nr);
+	  res = OK;
+  }
 
-  /* Set pending signal to be processed by the signal manager. */
-  cause_sig_deferred(proc_nr, sig_nr);
-
-  return(OK);
+  lock_proc(caller);
+  return(res);
 }
 
 #endif /* USE_KILL */

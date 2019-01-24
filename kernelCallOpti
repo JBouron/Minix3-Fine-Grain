@@ -13,37 +13,37 @@ O | KC_KTRACE_SYS_SETALARM     | 5869       |
 O | KC_KTRACE_SYS_SCHEDULE     | 695        | 
 O | KC_KTRACE_SYS_FORK         | 670        | 
   | KC_KTRACE_SYS_EXEC         | 612        | Fix pdes in data_copy
-  | KC_KTRACE_SYS_CLEAR        | 638        | 
-  | KC_KTRACE_SYS_GETINFO      | 444        | 
-  | KC_KTRACE_SYS_TIMES        | 638        | 
-  | KC_KTRACE_SYS_RUNCTL       | 640        | 
-  | KC_KTRACE_SYS_SCHEDCTL     | 691        | 
+  | KC_KTRACE_SYS_CLEAR        | 638        | Hard AF, lock hell.
+  | KC_KTRACE_SYS_GETINFO      | 444        | Fix data_copy_vmcheck.
+O | KC_KTRACE_SYS_TIMES        | 638        | 
+O | KC_KTRACE_SYS_RUNCTL       | 640        | 
+O | KC_KTRACE_SYS_SCHEDCTL     | 691        | 
   | KC_KTRACE_SYS_VSAFECOPY    | 80         | Fix pdes in data_copy
   | KC_KTRACE_SYS_PRIVCTL      | 109        | Fix pdes in data_copy
-  | KC_KTRACE_SYS_SETGRANT     | 83         | 
-  | KC_KTRACE_SYS_STATECTL     | 69         | 
-  | KC_KTRACE_SYS_DIAGCTL      | 29         | 
-  | KC_KTRACE_SYS_IRQCTL       | 21         | 
-  | KC_KTRACE_SYS_READBIOS     | 6          | 
-  | KC_KTRACE_SYS_GETKSIG      | 10         | 
-  | KC_KTRACE_SYS_KILL         | 6          | 
-  | KC_KTRACE_SYS_ENDKSIG      | 2          | 
-  | KC_KTRACE_SYS_SDEVIO       | 1          | 
-  | KC_KTRACE_SYS_EXIT         | 2          | 
-  | KC_KTRACE_SYS_SIGSEND      | 1          | 
+O | KC_KTRACE_SYS_SETGRANT     | 83         | 
+  | KC_KTRACE_SYS_STATECTL     | 69         | Clr IPC, data_copy
+  | KC_KTRACE_SYS_DIAGCTL      | 29         | data_copy
+O | KC_KTRACE_SYS_IRQCTL       | 21         | 
+  | KC_KTRACE_SYS_READBIOS     | 6          | virt_copy
+O | KC_KTRACE_SYS_GETKSIG      | 10         | 
+O | KC_KTRACE_SYS_KILL         | 6          | 
+O | KC_KTRACE_SYS_ENDKSIG      | 2          | 
+  | KC_KTRACE_SYS_SDEVIO       | 1          | Verify_grant -> data_copy
+O | KC_KTRACE_SYS_EXIT         | 2          | 
+  | KC_KTRACE_SYS_SIGSEND      | 1          | data_copy
   | KC_KTRACE_SYS_SIGRETURN    | 1          | Fix pdes in data_copy
-  | KC_KTRACE_SYS_STIME        | 1          | 
-  | KC_KTRACE_SYS_SAFEMEMSET   | 0          | 
-  | KC_KTRACE_SYS_IOPENABLE    | 0          | 
+0 | KC_KTRACE_SYS_STIME        | 1          | 
+  | KC_KTRACE_SYS_SAFEMEMSET   | 0          | data_copy
+O | KC_KTRACE_SYS_IOPENABLE    | 0          | 
   | KC_KTRACE_SYS_UPDATE       | 0          | Fix pdes in data_copy
-  | KC_KTRACE_SYS_ABORT        | 0          | 
+O | KC_KTRACE_SYS_ABORT        | 0          | 
   | KC_KTRACE_SYS_SETMCONTEXT  | 0          | Fix pdes in data_copy
   | KC_KTRACE_SYS_VUMAP        | 0          | Fix pdes in data_copy
-  | KC_KTRACE_SYS_UMAP_REMOTE  | 0          | 
-  | KC_KTRACE_SYS_TRACE        | 0          | 
+  | KC_KTRACE_SYS_UMAP_REMOTE  | 0          | data_copy
+  | KC_KTRACE_SYS_TRACE        | 0          | data_copy (ALSO DISABLED ??)
   | KC_KTRACE_SYS_SPROF        | 0          | Fix pdes in data_copy
-  | KC_KTRACE_SYS_GETMCONTEXT  | 0          | 
-  | KC_KTRACE_SYS_SETTIME      | 0          | 
-  | KC_KTRACE_SYS_VTIMER       | 0          | 
+  | KC_KTRACE_SYS_GETMCONTEXT  | 0          | data_copy
+O | KC_KTRACE_SYS_SETTIME      | 0          | 
+O | KC_KTRACE_SYS_VTIMER       | 0          | 
   | KC_KTRACE_SYS_PADCONF      | 0          | 
    

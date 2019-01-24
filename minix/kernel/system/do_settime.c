@@ -31,7 +31,7 @@ int do_settime(struct proc * caller, message * m_ptr)
 	ticks = (m_ptr->m_lsys_krn_sys_settime.sec * system_hz) +
 		(m_ptr->m_lsys_krn_sys_settime.nsec/(1000000000/system_hz));
 	set_adjtime_delta(ticks);
-	return(OK);
+	goto end;
   } /* else user wants to set the time */
 
   boottime = get_boottime();
@@ -45,7 +45,7 @@ int do_settime(struct proc * caller, message * m_ptr)
   	/* boottime was likely wrong, try to correct it. */
 	set_boottime(m_ptr->m_lsys_krn_sys_settime.sec);
 	set_realtime(1);
-	return(OK);
+	goto end;
   }
 
   /* calculate the new value of realtime in ticks */
@@ -54,5 +54,10 @@ int do_settime(struct proc * caller, message * m_ptr)
 
   set_realtime(newclock);
 
+end:
+  lock_proc(caller);
   return(OK);
+fail:
+  lock_proc(caller);
+  return EINVAL;
 }

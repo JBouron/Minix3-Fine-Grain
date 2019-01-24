@@ -9,6 +9,7 @@
  */
 
 #include "kernel/system.h"
+#include "kernel/proc.h"
 
 #include <signal.h>
 #include <minix/endpoint.h>
@@ -18,25 +19,19 @@
 /*===========================================================================*
  *				do_vtimer				     *
  *===========================================================================*/
-int do_vtimer(struct proc * caller, message * m_ptr)
+static int do_vtimer_impl(struct proc * caller, message * m_ptr)
 {
 /* Set and/or retrieve the value of one of a process' virtual timers. */
   struct proc *rp;		/* pointer to process the timer belongs to */
   register int pt_flag;		/* the misc on/off flag for the req.d timer */
   register clock_t *pt_left;	/* pointer to the process' ticks-left field */ 
   clock_t old_value;		/* the previous number of ticks left */
-  int proc_nr, proc_nr_e;
 
   /* The requesting process must be privileged. */
   if (! (priv(caller)->s_flags & SYS_PROC)) return(EPERM);
 
   if (m_ptr->VT_WHICH != VT_VIRTUAL && m_ptr->VT_WHICH != VT_PROF)
       return(EINVAL);
-
-  /* The target process must be valid. */
-  proc_nr_e = (m_ptr->VT_ENDPT == SELF) ? caller->p_endpoint : m_ptr->VT_ENDPT;
-  if (!isokendpt(proc_nr_e, &proc_nr)) return(EINVAL);
-  rp = proc_addr(proc_nr);
 
   /* Determine which flag and which field in the proc structure we want to
    * retrieve and/or modify. This saves us having to differentiate between
@@ -71,6 +66,29 @@ int do_vtimer(struct proc * caller, message * m_ptr)
   m_ptr->VT_VALUE = old_value;
 
   return(OK);
+}
+
+int do_vtimer(struct proc * caller, message * m_ptr)
+{
+	int proc_nr, proc_nr_e;
+	struct proc *rp;
+
+	/* The target process must be valid. */
+	proc_nr_e = (m_ptr->VT_ENDPT == SELF) ? caller->p_endpoint : m_ptr->VT_ENDPT;
+	if (!isokendpt(proc_nr_e, &proc_nr)) goto fail;
+	rp = proc_addr(proc_nr);
+
+	lock_two_procs(caller,rp);
+	const int res = do_vtimer_impl(caller,m_ptr);
+
+	if(rp!=caller) {
+		unlock_proc(rp);
+	}
+	/* Else, keep the lock on caller. */
+	return res;
+fail:
+	lock_proc(caller);
+	return(EINVAL);
 }
 
 #endif /* USE_VTIMER */

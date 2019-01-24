@@ -140,6 +140,7 @@ static int do_irqctl_no_lock(struct proc * caller, message * m_ptr)
 int do_irqctl(struct proc * caller, message * m_ptr)
 {
 	int res;
+	lock_proc(caller);
 	lock_irq();
 	res = do_irqctl_no_lock(caller,m_ptr);
 	unlock_irq();

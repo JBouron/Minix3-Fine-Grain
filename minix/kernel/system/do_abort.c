@@ -22,6 +22,7 @@ int do_abort(struct proc * caller, message * m_ptr)
 
   /* Now prepare to shutdown MINIX. */
   prepare_shutdown(how);
+  lock_proc(caller);
   return(OK);				/* pro-forma (really EDISASTER) */
 }
 

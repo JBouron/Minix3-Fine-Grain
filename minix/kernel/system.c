@@ -107,6 +107,20 @@ static int is_kernel_call_optimized(int call_nr)
 		SYS_SETALARM,
 		SYS_SCHEDULE,
 		SYS_FORK,
+		SYS_TIMES,
+		SYS_RUNCTL,
+		SYS_SCHEDCTL,
+		SYS_SETGRANT,
+		SYS_IRQCTL,
+		SYS_GETKSIG,
+		SYS_KILL,
+		SYS_ENDKSIG,
+		SYS_EXIT,
+		SYS_STIME,
+		SYS_IOPENABLE,
+		SYS_ABORT,
+		SYS_SETTIME,
+		SYS_VTIMER,
 		/* Add optimized calls to the list ... */
 	};
 	for(i=0;

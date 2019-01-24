@@ -16,6 +16,8 @@ int do_setgrant(struct proc * caller, message * m_ptr)
 {
 	int r;
 
+	lock_proc(caller);
+
 	/* Copy grant table set in priv. struct. */
 	if (RTS_ISSET(caller, RTS_NO_PRIV) || !(priv(caller))) {
 		r = EPERM;

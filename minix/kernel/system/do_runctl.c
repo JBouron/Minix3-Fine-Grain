@@ -15,7 +15,7 @@
 /*===========================================================================*
  *				  do_runctl				     *
  *===========================================================================*/
-int do_runctl(struct proc * caller, message * m_ptr)
+static int do_runctl_impl(struct proc * rp, message * m_ptr)
 {
 /* Control a process's RTS_PROC_STOP flag. Used for process management.
  * If the process is queued sending a message or stopped for system call
@@ -23,13 +23,7 @@ int do_runctl(struct proc * caller, message * m_ptr)
  * of RTS_PROC_STOP, and send a SIGSNDELAY signal later when the process is done
  * sending (ending the delay). Used by PM for safe signal delivery.
  */
-  int proc_nr, action, flags;
-  register struct proc *rp;
-
-  /* Extract the message parameters and do sanity checking. */
-  if (!isokendpt(m_ptr->RC_ENDPT, &proc_nr)) return(EINVAL);
-  if (iskerneln(proc_nr)) return(EPERM);
-  rp = proc_addr(proc_nr);
+  int action, flags;
 
   action = m_ptr->RC_ACTION;
   flags = m_ptr->RC_FLAGS;
@@ -72,5 +66,25 @@ int do_runctl(struct proc * caller, message * m_ptr)
   return(OK);
 }
 
-#endif /* USE_RUNCTL */
+int do_runctl(struct proc * caller, message * m_ptr)
+{
+	int res,proc_nr;
+	struct proc *rp;
+	/* Extract the message parameters and do sanity checking. */
+	if (!isokendpt(m_ptr->RC_ENDPT, &proc_nr)) {
+		res =(EINVAL);
+	} else if (iskerneln(proc_nr)) {
+		res = (EPERM);
+	} else {
+		rp = proc_addr(proc_nr);
 
+		lock_proc(rp);
+		res = do_runctl_impl(rp,m_ptr);
+		unlock_proc(rp);
+	}
+
+	lock_proc(caller);
+	return res;
+}
+
+#endif /* USE_RUNCTL */
