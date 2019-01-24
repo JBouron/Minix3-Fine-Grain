@@ -26,6 +26,8 @@ int do_setalarm(struct proc * caller, message * m_ptr)
   minix_timer_t *tp;		/* the process' timer structure */
   clock_t uptime;		/* placeholder for current uptime */
 
+  lock_proc(caller);
+
   /* Extract shared parameters from the request message. */
   exp_time = m_ptr->m_lsys_krn_sys_setalarm.exp_time;
   use_abs_time = m_ptr->m_lsys_krn_sys_setalarm.abs_time;

@@ -23,7 +23,7 @@
 /*===========================================================================*
  *				do_fork					     *
  *===========================================================================*/
-int do_fork(struct proc * caller, message * m_ptr)
+static int do_fork_impl(struct proc * rpp, struct proc *rpc, message * m_ptr)
 {
 /* Handle sys_fork().
  * m_lsys_krn_sys_fork.endpt has forked.
@@ -32,17 +32,9 @@ int do_fork(struct proc * caller, message * m_ptr)
 #if defined(__i386__)
   char *old_fpu_save_area_p;
 #endif
-  register struct proc *rpc;		/* child process pointer */
-  struct proc *rpp;			/* parent process pointer */
   int gen;
-  int p_proc;
   int namelen;
 
-  if(!isokendpt(m_ptr->m_lsys_krn_sys_fork.endpt, &p_proc))
-	return EINVAL;
-
-  rpp = proc_addr(p_proc);
-  rpc = proc_addr(m_ptr->m_lsys_krn_sys_fork.slot);
   if (isemptyp(rpp) || ! isemptyp(rpc)) return(EINVAL);
 
   assert(!(rpp->p_misc_flags & MF_DELIVERMSG));
@@ -133,6 +125,25 @@ int do_fork(struct proc * caller, message * m_ptr)
 #endif
 
   return OK;
+}
+
+int do_fork(struct proc * caller, message * m_ptr)
+{
+	int p_proc,res;
+	struct proc *rpp, *rpc;
+
+	if(!isokendpt(m_ptr->m_lsys_krn_sys_fork.endpt, &p_proc)) {
+		res = EINVAL;
+	} else {
+		rpp = proc_addr(p_proc);
+		rpc = proc_addr(m_ptr->m_lsys_krn_sys_fork.slot);
+
+		lock_two_procs(rpp,rpc);
+		res = do_fork_impl(rpp,rpc,m_ptr);
+		unlock_two_procs(rpp,rpc);
+	}
+	lock_proc(caller);
+	return res;
 }
 
 #endif /* USE_FORK */

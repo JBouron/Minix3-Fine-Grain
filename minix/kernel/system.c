@@ -104,6 +104,9 @@ static int is_kernel_call_optimized(int call_nr)
 	static int optimized_kernel_calls[] = {
 		SYS_DEVIO,
 		SYS_VMCTL,
+		SYS_SETALARM,
+		SYS_SCHEDULE,
+		SYS_FORK,
 		/* Add optimized calls to the list ... */
 	};
 	for(i=0;
@@ -789,6 +792,7 @@ void kernel_call_resume(struct proc *caller)
  *===========================================================================*/
 int sched_proc(struct proc *p, int priority, int quantum, int cpu, int niced)
 {
+	assert(proc_locked(p));
 	/* Make sure the values given are within the allowed range.*/
 	if ((priority < TASK_Q && priority != -1) || priority > NR_SCHED_QUEUES)
 		return(EINVAL);
