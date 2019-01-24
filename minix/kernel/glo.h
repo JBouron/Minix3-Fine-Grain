@@ -42,6 +42,9 @@ EXTERN vir_bytes minix_kerninfo_user;
 #define system_hz (kclockinfo.hz)		/* HZ value (alias) */
 
 /* Process scheduling information and the kernel reentry count. */
+SPINLOCK_DECLARE(vmrequest_lock); /* Must be acquired after all proc locks. */
+#define lock_vmrequest() spinlock_lock(&vmrequest_lock)
+#define unlock_vmrequest() spinlock_unlock(&vmrequest_lock)
 EXTERN struct proc *vmrequest;  /* first process on vmrequest queue */
 EXTERN unsigned lost_ticks;	/* clock ticks counted outside clock task */
 EXTERN char *ipc_call_names[IPCNO_HIGHEST+1]; /* human-readable call names */

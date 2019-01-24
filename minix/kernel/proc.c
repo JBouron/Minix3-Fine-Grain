@@ -270,10 +270,12 @@ void vm_suspend(struct proc *caller, const struct proc *target,
         caller->p_vmrequest.type = type;
 
         /* Connect caller on vmrequest wait queue. */
+	lock_vmrequest();
         if(!(caller->p_vmrequest.nextrequestor = vmrequest))
                 if(OK != send_sig_deferred(VM_PROC_NR, SIGKMEM))
                         panic("send_sig failed");
         vmrequest = caller;
+	unlock_vmrequest();
 }
 
 /*===========================================================================*

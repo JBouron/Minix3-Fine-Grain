@@ -19,6 +19,7 @@ extern char *video_mem;
 static void setcr3(struct proc *p, u32_t cr3, u32_t *v)
 {
 	/* Set process CR3. */
+	lock_proc(p);
 	p->p_seg.p_cr3 = cr3;
 	assert(p->p_seg.p_cr3);
 	p->p_seg.p_cr3_v = v; 
@@ -30,6 +31,7 @@ static void setcr3(struct proc *p, u32_t cr3, u32_t *v)
 			panic("arch_enable_paging failed");
 	}
 	RTS_UNSET(p, RTS_VMINHIBIT);
+	unlock_proc(p);
 }
 
 /*===========================================================================*

@@ -103,6 +103,7 @@ static int is_kernel_call_optimized(int call_nr)
 	int i;
 	static int optimized_kernel_calls[] = {
 		SYS_DEVIO,
+		SYS_VMCTL,
 		/* Add optimized calls to the list ... */
 	};
 	for(i=0;
@@ -634,6 +635,7 @@ static void clear_memreq(struct proc *rp)
   if (!RTS_ISSET(rp, RTS_VMREQUEST))
 	return; /* nothing to do */
 
+  lock_vmrequest();
   for (rpp = &vmrequest; *rpp != NULL;
      rpp = &(*rpp)->p_vmrequest.nextrequestor) {
 	if (*rpp == rp) {
@@ -641,6 +643,7 @@ static void clear_memreq(struct proc *rp)
 		break;
 	}
   }
+  unlock_vmrequest();
 
   RTS_UNSET(rp, RTS_VMREQUEST);
 }
@@ -913,9 +916,11 @@ void clear_ipc_filters(struct proc *rp)
 	 * blocked memory handling requests, we may now have to tell VM that
 	 * there are "new" requests pending.
 	 */
+	lock_vmrequest();
 	if (rp->p_endpoint == VM_PROC_NR && vmrequest != NULL)
 		if (send_sig_deferred(VM_PROC_NR, SIGKMEM) != OK)
 			panic("send_sig failed");
+	unlock_vmrequest();
 }
 
 /*===========================================================================*

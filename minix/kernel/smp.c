@@ -29,6 +29,7 @@ static struct sched_ipi_data  sched_ipi_data[CONFIG_MAX_CPUS];
 
 static volatile unsigned ap_cpus_booted;
 
+SPINLOCK_DEFINE(vmrequest_lock)
 SPINLOCK_DEFINE(big_kernel_lock)
 SPINLOCK_DEFINE(boot_lock)
 
