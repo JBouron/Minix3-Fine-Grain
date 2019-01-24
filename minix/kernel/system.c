@@ -168,6 +168,8 @@ static int kernel_call_dispatch(struct proc * caller, message *msg)
 	  }
 	  /* The unlock on caller will be performed by kernel_call_finish. */
   }
+  /* Indicate the end of the kernel call to the profiler. */
+  ktzprofile_event(KTRACE_KERNEL_CALL_END);
 
   return result;
 }

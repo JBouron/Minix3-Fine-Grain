@@ -722,6 +722,8 @@ int do_ipc(reg_t r1, reg_t r2, reg_t r3)
 	}
   }
 end:
+  /* Indicate end of IPC to the profile. */
+  ktzprofile_event(KTRACE_IPC_END);
   caller_ptr->p_in_ipc_op = 0;
   return res;
 }

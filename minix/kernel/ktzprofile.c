@@ -69,7 +69,7 @@ void ktzprofile_init(void)
 			event=KTRACE_SYS_FORK;
 			for(;event<=KTRACE_SYS_PADCONF;++event) {
 				stat = &(data->kernel_call_stats[event]);
-				init_stat(stat,event,KTRACE_BKL_RELEASE);
+				init_stat(stat,event,KTRACE_KERNEL_CALL_END);
 			}
 		}
 
@@ -78,7 +78,7 @@ void ktzprofile_init(void)
 			for(;event<=KTRACE_SENDA;++event) {
 				int e = event-KTRACE_SEND;
 				stat = &(data->ipc_stats[e]);
-				init_stat(stat,event,KTRACE_BKL_RELEASE);
+				init_stat(stat,event,KTRACE_IPC_END);
 			}
 		}
 	}
