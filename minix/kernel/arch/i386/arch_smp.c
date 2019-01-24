@@ -92,6 +92,22 @@ void unlock_all_procs(void)
 	}
 }
 
+void unlock_all_procs_except(int except_proc_nr)
+{
+       int p,nprocs,cpu;
+       cpu = cpuid;
+       bkl_owner = -1;
+       nprocs = sizeof(proc)/sizeof(struct proc);
+       for(p=0;p<nprocs;++p) {
+               if(proc[p].p_nr!=except_proc_nr) {
+		       assert(proc[p].p_lock.owner==cpu);
+                       proc[p].p_lock.owner = -1;
+                       spinlock_unlock(&(proc[p].p_lock.lock));
+	       }
+       }
+}
+
+
 void _reentrantlock_lock(reentrantlock_t *rl)
 {
 	int cpu = cpuid;

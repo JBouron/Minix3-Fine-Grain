@@ -35,6 +35,9 @@ int do_devio(struct proc * caller, message * m_ptr)
 	default: size= 4; break;	/* Be conservative */
     }
 
+    /* Lock the caller while reading its priv struct. */
+    lock_proc(caller);
+
     privp= priv(caller);
     if (!privp)
     {

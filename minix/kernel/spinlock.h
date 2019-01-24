@@ -76,6 +76,8 @@ void __gdb_bkl_unlock(spinlock_t *lock, int cpu);
 
 void lock_all_procs(void);
 void unlock_all_procs(void);
+/* Unlock all the procs of the proc table except for `except_proc_nr`. */
+void unlock_all_procs_except(int except_proc_nr);
 
 /* To lock/unlock the BKL from asm: */
 void bkl_lock(void);
