@@ -2059,12 +2059,21 @@ void enqueue(
 	   * it gets preempted. The current process must be preemptible. Testing
 	   * the priority also makes sure that a process does not preempt itself
 	   */
+#if 0
+	  /* TODO: Preemption is disabled until we find a way to do it without
+	   * race condition (and also remotely).
+	   *
+	   * ##################################################################
+	   * ##################################################################
+	   */
+
 	  struct proc * p;
 	  p = get_cpulocal_var(proc_ptr);
 	  assert(p);
 	  if((p->p_priority > rp->p_priority) &&
 			  (priv(p)->s_flags & PREEMPTIBLE))
 		  RTS_SET_UNSAFE(p, RTS_PREEMPTED); /* calls dequeue() */
+#endif
   }
 #ifdef CONFIG_SMP
   /*

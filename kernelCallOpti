@@ -45,5 +45,5 @@ O | KC_KTRACE_SYS_ABORT        | 0          |
   | KC_KTRACE_SYS_GETMCONTEXT  | 0          | data_copy
 O | KC_KTRACE_SYS_SETTIME      | 0          | 
 O | KC_KTRACE_SYS_VTIMER       | 0          | 
-  | KC_KTRACE_SYS_PADCONF      | 0          | 
+X | KC_KTRACE_SYS_PADCONF      | 0          | Not present for i386
    
