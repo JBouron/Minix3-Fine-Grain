@@ -383,14 +383,14 @@ not_runnable_pick_new:
 	get_cpulocal_var(proc_ptr) = get_cpulocal_var_ptr(idle_proc);
 	unlock_proc(p);
 
-	lock_runqueues(cpuid);
-
 	/*
 	 * if we have no process to run, set IDLE as the current process for
 	 * time accounting and put the cpu in an idle state. After the next
 	 * timer interrupt the execution resumes here and we can pick another
 	 * process. If there is still nothing runnable we "schedule" IDLE again
 	 */
+retry_pick:
+	lock_runqueues(cpuid);
 	while (!(p = pick_proc())) {
 		/* Set the idle state while holding the queue lock to avoid
 		 * race conditions. */
@@ -405,7 +405,14 @@ not_runnable_pick_new:
 	unlock_runqueues(cpuid);
 
 	lock_proc(p);
-	assert(p->p_cpu==cpuid);
+	if(p->p_cpu!=cpuid) {
+		/* We have a small race-condition here. During the small gap
+		 * between the proc selection and the lock on p, p might have
+		 * been migrated. In this case, simply do nothing on p, it is
+		 * not owned by this cpu anymore. And retry the pick_proc. */
+		unlock_proc(p);
+		goto retry_pick;
+	}
 	if(!proc_is_runnable(p)) {
 		goto not_runnable_pick_new;
 	}
@@ -1772,11 +1779,12 @@ static int try_async(struct proc * caller_ptr)
 	 * Do not copy from a process which does not have a stable address space
 	 * due to VM fiddling with it
 	 */
+	lock_two_procs(caller_ptr,src_ptr);
 	if (RTS_ISSET(src_ptr, RTS_VMINHIBIT)) {
+		unlock_two_procs(caller_ptr,src_ptr);
 		continue;
 	}
 #endif
-	lock_two_procs(caller_ptr,src_ptr);
 	assert(!(caller_ptr->p_misc_flags & MF_DELIVERMSG));
 	assert(!RTS_ISSET(src_ptr, RTS_VMINHIBIT));
 	r = try_one(ANY, src_ptr, caller_ptr);
