@@ -30,6 +30,9 @@ int cpu_has_tsc;
 void
 reset(void)
 {
+	while(1)
+		; // Never reset, we want to keep the state of the machine
+		  // as is in the fuzzer.
         uint8_t b;
         /*
          * The keyboard controller has 4 random output pins, one of which is
