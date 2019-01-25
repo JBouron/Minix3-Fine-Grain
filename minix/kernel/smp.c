@@ -165,7 +165,9 @@ void smp_schedule_migrate_proc(struct proc * p, unsigned dest_cpu)
 	assert(p->p_cpu!=cpuid);
 	assert(p->p_cpu!=dest_cpu);
 	p->p_next_cpu = dest_cpu;
-	smp_schedule_sync(p,SCHED_IPI_MIGRATE);
+
+	/* The destination cpu also needs to save any FPU state. */
+	smp_schedule_sync(p,SCHED_IPI_MIGRATE|SCHED_IPI_SAVE_CTX);
 
 	/* Either the migration has been scheduled for the next round or has
 	 * been performed immediately. */
