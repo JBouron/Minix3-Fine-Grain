@@ -361,6 +361,7 @@ not_runnable_pick_new:
 	if (proc_is_migrating(p)) {
 		/* Somebody wants to migrate this process. now that its
 		 * time-slice or kernel operation is over we can migrate it. */
+		assert(p->p_next_cpu!=-1);
 		p->p_cpu = p->p_next_cpu;
 		p->p_next_cpu = -1;
 		/* Enqueue p on its new cpu. */

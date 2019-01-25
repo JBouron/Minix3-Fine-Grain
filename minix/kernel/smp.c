@@ -91,9 +91,7 @@ static void smp_schedule_sync(struct proc * p, unsigned task)
 retry:
 	if (sched_ipi_data[cpu].flags != 0) {
 		while (sched_ipi_data[cpu].flags != 0) {
-			if (sched_ipi_data[mycpu].flags) {
-				smp_sched_handler();
-			}
+			arch_pause();
 		}
 	}
 
@@ -123,9 +121,7 @@ retry:
 
 	/* wait until the destination cpu finishes its job */
 	while (sched_ipi_data[cpu].flags != 0) {
-		if (sched_ipi_data[mycpu].flags) {
-			smp_sched_handler();
-		}
+		arch_pause();
 	}
 }
 
@@ -170,6 +166,10 @@ void smp_schedule_migrate_proc(struct proc * p, unsigned dest_cpu)
 	assert(p->p_cpu!=dest_cpu);
 	p->p_next_cpu = dest_cpu;
 	smp_schedule_sync(p,SCHED_IPI_MIGRATE);
+
+	/* Either the migration has been scheduled for the next round or has
+	 * been performed immediately. */
+	assert(RTS_ISSET(p,RTS_PROC_MIGR)||p->p_cpu==dest_cpu);
 }
 
 void smp_dequeue_task(struct proc *p)
@@ -177,6 +177,7 @@ void smp_dequeue_task(struct proc *p)
 	assert(p->p_enqueued);
 	assert(proc_locked(p));
 	smp_schedule_sync(p,SCHED_IPI_DEQUEUE);
+	assert(!p->p_enqueued);
 }
 
 void smp_sched_handler(void)
@@ -219,14 +220,14 @@ void smp_sched_handler(void)
 		}
 		if (flgs&SCHED_IPI_MIGRATE) {
 			assert(p->p_cpu==cpu);
+			assert(p->p_next_cpu!=-1);
+			assert(p->p_next_cpu!=cpu);
 			if(get_cpu_var(cpu,proc_ptr)==p) {
 				/* This proc might be in the middle of it's
 				 * user timeslice or in a kernel operation.
 				 * Thus let it finish and defer the migration
 				 * until the switch_to_user by setting the
 				 * RTS_PROC_MIGR flag. */
-				assert(p->p_next_cpu!=cpu);
-				assert(p->p_next_cpu!=-1);
 				RTS_SET_BORROW(p,RTS_PROC_MIGR);
 			} else {
 				/* This proc is either not runnable, or
@@ -239,12 +240,14 @@ void smp_sched_handler(void)
 				RTS_UNSET_BORROW(p,RTS_PROC_MIGR);
 			}
 		}
-	}
 
-	__insn_barrier();
-	spinlock_lock(&(sched_ipi_data[cpu].lock));
-	sched_ipi_data[cpu].flags = 0;
-	spinlock_unlock(&(sched_ipi_data[cpu].lock));
+		/* Reset the flag value to indicate to the source cpu that we
+		 * are done processing the request. */
+		__insn_barrier();
+		spinlock_lock(&(sched_ipi_data[cpu].lock));
+		sched_ipi_data[cpu].flags = 0;
+		spinlock_unlock(&(sched_ipi_data[cpu].lock));
+	}
 }
 
 /*

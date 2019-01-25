@@ -251,20 +251,6 @@ void context_stop(struct proc * p)
 		bkl_succ[cpu] += !(!(succ == 0));
 
 		p->p_cycles = p->p_cycles + tsc - *__tsc_ctr_switch;
-
-#ifdef CONFIG_SMP
-		/*
-		 * Since at the time we got a scheduling IPI we might have been
-		 * waiting for BKL already, we may miss it due to a similar IPI to
-		 * the cpu which is already waiting for us to handle its. This
-		 * results in a live-lock of these two cpus.
-		 *
-		 * Therefore we always check if there is one pending and if so,
-		 * we handle it straight away so the other cpu can continue and
-		 * we do not deadlock.
-		 */
-		smp_sched_handler();
-#endif
 	}
 #else
 	read_tsc_64(&tsc);
