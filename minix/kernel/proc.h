@@ -360,8 +360,10 @@ void lock_two_procs(struct proc *p1,struct proc *p2);
 void unlock_two_procs(struct proc *p1,struct proc *p2);
 
 void lock_four_procs(struct proc *p1,struct proc *p2,struct proc *p3,struct proc *p4);
-void unlock_three_procs(struct proc *p1,struct proc *p2,struct proc *p3);
 void unlock_four_procs(struct proc *p1,struct proc *p2,struct proc *p3,struct proc *p4);
+
+void lock_three_procs(struct proc *p1,struct proc *p2,struct proc *p3);
+void unlock_three_procs(struct proc *p1,struct proc *p2,struct proc *p3);
 #endif /* __ASSEMBLY__ */
 
 #endif /* PROC_H */

@@ -2655,11 +2655,6 @@ void lock_four_procs(struct proc *p1,struct proc *p2,struct proc *p3,struct proc
 	}
 }
 
-void unlock_three_procs(struct proc *p1,struct proc *p2,struct proc *p3)
-{
-	unlock_four_procs(p1,p2,p3,NULL);
-}
-
 void unlock_four_procs(struct proc *p1,struct proc *p2,struct proc *p3,struct proc *p4)
 {
 	struct proc *sorted[4];
@@ -2673,4 +2668,14 @@ void unlock_four_procs(struct proc *p1,struct proc *p2,struct proc *p3,struct pr
 			unlock_proc(sorted[i]);
 		last = sorted[i];
 	}
+}
+
+void lock_three_procs(struct proc *p1,struct proc *p2,struct proc *p3)
+{
+	lock_four_procs(p1,p2,p3,NULL);
+}
+
+void unlock_three_procs(struct proc *p1,struct proc *p2,struct proc *p3)
+{
+	unlock_four_procs(p1,p2,p3,NULL);
 }

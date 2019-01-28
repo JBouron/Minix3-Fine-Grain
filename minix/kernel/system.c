@@ -121,6 +121,8 @@ static int is_kernel_call_optimized(int call_nr)
 		SYS_ABORT,
 		SYS_SETTIME,
 		SYS_VTIMER,
+		SYS_PHYSCOPY,
+		SYS_VIRCOPY
 		/* Add optimized calls to the list ... */
 	};
 	for(i=0;
