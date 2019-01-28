@@ -27,13 +27,15 @@ phys_bytes video_mem_vaddr = 0;
 
 #define HASPT(procptr) ((procptr)->p_seg.p_cr3 != 0)
 static int nfreepdes = 0;
-#define MAXFREEPDES	2
+#define MAXFREEPDES	(2*CONFIG_MAX_CPUS)
 static int freepdes[MAXFREEPDES];
 
 static u32_t phys_get32(phys_bytes v);
 
 void mem_clear_mapcache(void)
 {
+	/* TODO: How do we know which cache to clear ? For which CPU ? */
+	return;
 	int i;
 	for(i = 0; i < nfreepdes; i++) {
 		struct proc *ptproc = get_cpulocal_var(ptproc);
@@ -77,6 +79,9 @@ static phys_bytes createpde(
 	u32_t pdeval;
 	phys_bytes offset;
 	int pde;
+
+	/* Use the cpu's PDEs for the copy. */
+	free_pde_idx = (2*cpuid)+free_pde_idx;
 
 	assert(free_pde_idx >= 0 && free_pde_idx < nfreepdes);
 	pde = freepdes[free_pde_idx];
@@ -706,14 +711,17 @@ int data_copy_vmcheck(struct proc * caller,
 
 void memory_init(void)
 {
+	int i;
 	assert(nfreepdes == 0);
 
-	freepdes[nfreepdes++] = kinfo.freepde_start++;
-	freepdes[nfreepdes++] = kinfo.freepde_start++;
+	/* We have 2 freedpdes per cpu. */
+	for(i=0;i<CONFIG_MAX_CPUS;++i) {
+		freepdes[nfreepdes++] = kinfo.freepde_start++;
+		freepdes[nfreepdes++] = kinfo.freepde_start++;
+	}
 
 	assert(kinfo.freepde_start < I386_VM_DIR_ENTRIES);
-	assert(nfreepdes == 2);
-	assert(nfreepdes <= MAXFREEPDES);
+	assert(nfreepdes == MAXFREEPDES);
 }
 
 /*===========================================================================*
