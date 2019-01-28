@@ -353,8 +353,8 @@ void _rts_setflags(struct proc *p,int flag);
 void lock_proc(struct proc *p);
 void unlock_proc(struct proc *p);
 
-int proc_locked(struct proc *p);
-int proc_locked_borrow(struct proc *p);
+int proc_locked(const struct proc *p);
+int proc_locked_borrow(const struct proc *p);
 
 void lock_two_procs(struct proc *p1,struct proc *p2);
 void unlock_two_procs(struct proc *p1,struct proc *p2);

@@ -1,0 +1,702 @@
+################ All cpus ################
++-------------------+------------+----------+----------+----------+-----------------+
+| Events            | Occurences | Min (ms) | Max (ms) | Avg (ms) | Total time (ms) |
++-------------------+------------+----------+----------+----------+-----------------+
+| BKL wait          | 1032295    | 0        | 25.02    | 25.02    | 19177.41        |
+| Crit Section dur. | 17         | 0        | 88.07    | 88.07    | 91.19           |
+| Kernel calls      | 3166837    | -0       | 25.06    | 25.06    | 82189.80        |
+| IPC               | 5524420    | -0       | 24.82    | 24.82    | 178275.03       |
+| Idle time         | 2344018    | 0.01     | 30031.96 | 30031.96 | 3931256.41      |
+| User time         | 8872756    | 0        | 20.20    | 20.20    | 57560.99        |
++-------------------+------------+----------+----------+----------+-----------------+
+BKL+CS+Idle+User:            tot=4008086.004 ms
+
+Top kernel calls:
++----------------------------+------------+----------+----------+----------+-----------------+
+| Kernel call                | Occurences | Min (ms) | Max (ms) | Avg (ms) | Total time (ms) |
++----------------------------+------------+----------+----------+----------+-----------------+
+| KC_KTRACE_SYS_SAFECOPYFROM | 293851     | -0       | 25.06    | 25.06    | 19825.29        |
+| KC_KTRACE_SYS_SAFECOPYTO   | 293197     | -0       | 23.69    | 23.69    | 15818.70        |
+| KC_KTRACE_SYS_VMCTL        | 1782392    | -0       | 22.49    | 22.49    | 14237.14        |
+| KC_KTRACE_SYS_VSAFECOPY    | 60349      | -0       | 24.11    | 24.11    | 8902.34         |
+| KC_KTRACE_SYS_VIRCOPY      | 159259     | -0       | 12.21    | 12.21    | 8216.58         |
+| KC_KTRACE_SYS_UMAP         | 66842      | -0       | 19.51    | 19.51    | 5047.88         |
+| KC_KTRACE_SYS_MEMSET       | 129450     | -0       | 10.95    | 10.95    | 4770.51         |
+| KC_KTRACE_SYS_DEVIO        | 276868     | -0       | 0.88     | 0.88     | 2875.29         |
+| KC_KTRACE_SYS_VDEVIO       | 8558       | -0       | 12.25    | 12.25    | 749.83          |
+| KC_KTRACE_SYS_PHYSCOPY     | 17051      | -0       | 0.70     | 0.70     | 660.16          |
+| KC_KTRACE_SYS_IRQCTL       | 18567      | -0       | 11.94    | 11.94    | 441.70          |
+| KC_KTRACE_SYS_SETALARM     | 48308      | -0       | 11.90    | 11.90    | 223.25          |
+| KC_KTRACE_SYS_SCHEDULE     | 1892       | -0       | 0.59     | 0.59     | 105.04          |
+| KC_KTRACE_SYS_FORK         | 1572       | -0       | 0.11     | 0.11     | 93.09           |
+| KC_KTRACE_SYS_EXEC         | 1363       | -0       | 0.22     | 0.22     | 86.38           |
+| KC_KTRACE_SYS_CLEAR        | 1540       | -0       | 0.10     | 0.10     | 53.44           |
+| KC_KTRACE_SYS_GETINFO      | 466        | 0.02     | 0.13     | 0.13     | 22.04           |
+| KC_KTRACE_SYS_RUNCTL       | 1688       | -0       | 2.54     | 2.54     | 17.84           |
+| KC_KTRACE_SYS_GETKSIG      | 32         | -0       | 0.89     | 0.89     | 11.05           |
+| KC_KTRACE_SYS_SIGSEND      | 69         | -0       | 0.24     | 0.24     | 7.50            |
+| KC_KTRACE_SYS_SCHEDCTL     | 1593       | -0       | 0.07     | 0.07     | 7.29            |
+| KC_KTRACE_SYS_TIMES        | 1540       | -0       | 0.09     | 0.09     | 6.20            |
+| KC_KTRACE_SYS_PRIVCTL      | 109        | -0       | 0.08     | 0.08     | 3.90            |
+| KC_KTRACE_SYS_SIGRETURN    | 69         | -0       | 0.09     | 0.09     | 3.16            |
+| KC_KTRACE_SYS_STATECTL     | 69         | 0.02     | 0.13     | 0.13     | 2.09            |
+| KC_KTRACE_SYS_DIAGCTL      | 29         | -0       | 0.06     | 0.06     | 1.26            |
+| KC_KTRACE_SYS_SETGRANT     | 84         | 0        | 0.10     | 0.10     | 0.32            |
+| KC_KTRACE_SYS_READBIOS     | 6          | -0       | 0.08     | 0.08     | 0.26            |
+| KC_KTRACE_SYS_ENDKSIG      | 13         | -0       | 0.06     | 0.06     | 0.17            |
+| KC_KTRACE_SYS_SDEVIO       | 1          | -0       | 0.06     | 0.06     | 0.06            |
+| KC_KTRACE_SYS_KILL         | 7          | -0       | 0.01     | 0.01     | 0.03            |
+| KC_KTRACE_SYS_EXIT         | 2          | -0       | 0        | 0        | 0.01            |
+| KC_KTRACE_SYS_STIME        | 1          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_VTIMER       | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_UPDATE       | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_PADCONF      | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_UMAP_REMOTE  | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_IOPENABLE    | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_SETTIME      | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_GETMCONTEXT  | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_SETMCONTEXT  | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_SAFEMEMSET   | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_VUMAP        | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_TRACE        | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_ABORT        | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_SPROF        | 0          | -0       | 0        | 0        | 0               |
++----------------------------+------------+----------+----------+----------+-----------------+
+
+Top IPC calls:
++---------------------------+------------+----------+----------+----------+-----------------+
+| IPC                       | Occurences | Min (ms) | Max (ms) | Avg (ms) | Total time (ms) |
++---------------------------+------------+----------+----------+----------+-----------------+
+| IPC_KTRACE_SENDA          | 794892     | 0        | 24.82    | 24.82    | 54380.28        |
+| IPC_KTRACE_SENDREC        | 907706     | 0.01     | 24.24    | 24.24    | 43113.62        |
+| IPC_KTRACE_RECEIVE        | 2376450    | 0        | 20.45    | 20.45    | 40705.29        |
+| IPC_KTRACE_SENDNB         | 624078     | -0       | 17.44    | 17.44    | 20140.30        |
+| IPC_KTRACE_SEND           | 819133     | -0       | 16.97    | 16.97    | 19891.30        |
+| IPC_KTRACE_NOTIFY         | 796        | -0       | 7.57     | 7.57     | 42.66           |
+| IPC_KTRACE_MINIX_KERNINFO | 1365       | 0        | 0        | 0        | 1.58            |
++---------------------------+------------+----------+----------+----------+-----------------+
+
+################ cpu0 ################
++-------------------+------------+----------+----------+----------+-----------------+
+| Events            | Occurences | Min (ms) | Max (ms) | Avg (ms) | Total time (ms) |
++-------------------+------------+----------+----------+----------+-----------------+
+| BKL wait          | 522151     | 0        | 12.18    | 12.18    | 7913.60         |
+| Crit Section dur. | 3          | 0        | 88.07    | 88.07    | 89.40           |
+| Kernel calls      | 2520985    | -0       | 22.49    | 22.49    | 40963.19        |
+| IPC               | 3677023    | 0        | 17.44    | 17.44    | 99195.54        |
+| Idle time         | 986624     | 0.01     | 16.88    | 16.88    | 169549.68       |
+| User time         | 6306236    | 0        | 20.20    | 20.20    | 35072.34        |
++-------------------+------------+----------+----------+----------+-----------------+
+BKL+CS+Idle+User:            tot=212625.029 ms
+
+Top kernel calls:
++----------------------------+------------+----------+----------+----------+-----------------+
+| Kernel call                | Occurences | Min (ms) | Max (ms) | Avg (ms) | Total time (ms) |
++----------------------------+------------+----------+----------+----------+-----------------+
+| KC_KTRACE_SYS_VMCTL        | 1782392    | 0        | 22.49    | 22.49    | 14237.14        |
+| KC_KTRACE_SYS_SAFECOPYTO   | 188397     | 0.05     | 0.17     | 0.17     | 9425.36         |
+| KC_KTRACE_SYS_VIRCOPY      | 159131     | 0.03     | 12.21    | 12.21    | 8209.57         |
+| KC_KTRACE_SYS_MEMSET       | 129450     | 0.03     | 10.95    | 10.95    | 4770.51         |
+| KC_KTRACE_SYS_DEVIO        | 181967     | 0.01     | 0.17     | 0.17     | 1711.06         |
+| KC_KTRACE_SYS_SAFECOPYFROM | 17780      | 0.05     | 0.23     | 0.23     | 998.71          |
+| KC_KTRACE_SYS_PHYSCOPY     | 17051      | 0.04     | 0.70     | 0.70     | 660.16          |
+| KC_KTRACE_SYS_UMAP         | 5101       | 0.04     | 0.14     | 0.14     | 317.93          |
+| KC_KTRACE_SYS_SETALARM     | 26089      | 0        | 11.90    | 11.90    | 121.69          |
+| KC_KTRACE_SYS_SCHEDULE     | 1892       | 0.01     | 0.59     | 0.59     | 105.04          |
+| KC_KTRACE_SYS_VDEVIO       | 1705       | 0.04     | 0.09     | 0.09     | 98.02           |
+| KC_KTRACE_SYS_FORK         | 1572       | 0.01     | 0.11     | 0.11     | 93.09           |
+| KC_KTRACE_SYS_EXEC         | 1363       | 0.04     | 0.22     | 0.22     | 86.38           |
+| KC_KTRACE_SYS_CLEAR        | 1540       | 0.03     | 0.10     | 0.10     | 53.44           |
+| KC_KTRACE_SYS_RUNCTL       | 1688       | 0        | 2.54     | 2.54     | 17.84           |
+| KC_KTRACE_SYS_GETINFO      | 353        | 0.02     | 0.12     | 0.12     | 16.89           |
+| KC_KTRACE_SYS_GETKSIG      | 32         | 0.02     | 0.89     | 0.89     | 11.05           |
+| KC_KTRACE_SYS_SIGSEND      | 69         | 0.05     | 0.24     | 0.24     | 7.50            |
+| KC_KTRACE_SYS_SCHEDCTL     | 1593       | 0        | 0.07     | 0.07     | 7.29            |
+| KC_KTRACE_SYS_TIMES        | 1540       | 0        | 0.09     | 0.09     | 6.20            |
+| KC_KTRACE_SYS_PRIVCTL      | 104        | 0.02     | 0.07     | 0.07     | 3.65            |
+| KC_KTRACE_SYS_SIGRETURN    | 69         | 0.04     | 0.09     | 0.09     | 3.16            |
+| KC_KTRACE_SYS_STATECTL     | 28         | 0.02     | 0.03     | 0.03     | 0.62            |
+| KC_KTRACE_SYS_IRQCTL       | 12         | 0.01     | 0.05     | 0.05     | 0.31            |
+| KC_KTRACE_SYS_ENDKSIG      | 13         | 0.01     | 0.06     | 0.06     | 0.17            |
+| KC_KTRACE_SYS_READBIOS     | 4          | 0.03     | 0.04     | 0.04     | 0.14            |
+| KC_KTRACE_SYS_SETGRANT     | 38         | 0        | 0        | 0        | 0.10            |
+| KC_KTRACE_SYS_SDEVIO       | 1          | 0.06     | 0.06     | 0.06     | 0.06            |
+| KC_KTRACE_SYS_DIAGCTL      | 2          | 0.02     | 0.04     | 0.04     | 0.06            |
+| KC_KTRACE_SYS_KILL         | 7          | 0        | 0.01     | 0.01     | 0.03            |
+| KC_KTRACE_SYS_EXIT         | 1          | 0        | 0        | 0        | 0               |
+| KC_KTRACE_SYS_STIME        | 1          | 0        | 0        | 0        | 0               |
+| KC_KTRACE_SYS_VTIMER       | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_UPDATE       | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_PADCONF      | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_UMAP_REMOTE  | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_IOPENABLE    | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_SETTIME      | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_GETMCONTEXT  | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_SETMCONTEXT  | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_VSAFECOPY    | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_SAFEMEMSET   | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_VUMAP        | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_TRACE        | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_ABORT        | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_SPROF        | 0          | -0       | 0        | 0        | 0               |
++----------------------------+------------+----------+----------+----------+-----------------+
+
+Top IPC calls:
++---------------------------+------------+----------+----------+----------+-----------------+
+| IPC                       | Occurences | Min (ms) | Max (ms) | Avg (ms) | Total time (ms) |
++---------------------------+------------+----------+----------+----------+-----------------+
+| IPC_KTRACE_SENDA          | 636524     | 0        | 7.46     | 7.46     | 40004.45        |
+| IPC_KTRACE_RECEIVE        | 1846404    | 0.01     | 13.62    | 13.62    | 26981.37        |
+| IPC_KTRACE_SENDNB         | 617826     | 0.01     | 17.44    | 17.44    | 19930.05        |
+| IPC_KTRACE_SEND           | 494866     | 0.01     | 0.20     | 0.20     | 9675.91         |
+| IPC_KTRACE_SENDREC        | 80835      | 0.01     | 1.96     | 1.96     | 2575.95         |
+| IPC_KTRACE_NOTIFY         | 403        | 0.01     | 7.34     | 7.34     | 27.61           |
+| IPC_KTRACE_MINIX_KERNINFO | 165        | 0        | 0        | 0        | 0.20            |
++---------------------------+------------+----------+----------+----------+-----------------+
+
+################ cpu1 ################
++-------------------+------------+----------+----------+----------+-----------------+
+| Events            | Occurences | Min (ms) | Max (ms) | Avg (ms) | Total time (ms) |
++-------------------+------------+----------+----------+----------+-----------------+
+| BKL wait          | 35964      | 0        | 11.62    | 11.62    | 773.84          |
+| Crit Section dur. | 2          | 0        | 0.09     | 0.09     | 0.27            |
+| Kernel calls      | 45610      | -0       | 11.72    | 11.72    | 4856.86         |
+| IPC               | 276115     | -0       | 24.82    | 24.82    | 18742.85        |
+| Idle time         | 127215     | 0.02     | 2747.23  | 2747.23  | 533719.67       |
+| User time         | 328743     | 0        | 16.62    | 16.62    | 4495.52         |
++-------------------+------------+----------+----------+----------+-----------------+
+BKL+CS+Idle+User:            tot=538989.300 ms
+
+Top kernel calls:
++----------------------------+------------+----------+----------+----------+-----------------+
+| Kernel call                | Occurences | Min (ms) | Max (ms) | Avg (ms) | Total time (ms) |
++----------------------------+------------+----------+----------+----------+-----------------+
+| KC_KTRACE_SYS_VSAFECOPY    | 33889      | 0.06     | 11.72    | 11.72    | 4633.98         |
+| KC_KTRACE_SYS_SAFECOPYFROM | 1409       | 0.05     | 0.49     | 0.49     | 116.45          |
+| KC_KTRACE_SYS_SAFECOPYTO   | 651        | 0.04     | 11.22    | 11.22    | 58.52           |
+| KC_KTRACE_SYS_SETALARM     | 9638       | 0        | 0.29     | 0.29     | 47.45           |
+| KC_KTRACE_SYS_STATECTL     | 8          | 0.03     | 0.04     | 0.04     | 0.25            |
+| KC_KTRACE_SYS_GETINFO      | 5          | 0.03     | 0.06     | 0.06     | 0.18            |
+| KC_KTRACE_SYS_SETGRANT     | 9          | 0        | 0        | 0        | 0.03            |
+| KC_KTRACE_SYS_EXIT         | 1          | 0        | 0        | 0        | 0               |
+| KC_KTRACE_SYS_VTIMER       | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_DEVIO        | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_SCHEDCTL     | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_PRIVCTL      | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_UPDATE       | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_RUNCTL       | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_PADCONF      | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_UMAP_REMOTE  | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_FORK         | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_MEMSET       | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_TIMES        | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_IOPENABLE    | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_DIAGCTL      | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_EXEC         | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_VMCTL        | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_SETTIME      | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_GETMCONTEXT  | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_SDEVIO       | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_ENDKSIG      | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_SETMCONTEXT  | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_SAFEMEMSET   | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_VIRCOPY      | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_VUMAP        | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_TRACE        | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_PHYSCOPY     | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_IRQCTL       | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_ABORT        | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_SPROF        | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_READBIOS     | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_STIME        | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_CLEAR        | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_VDEVIO       | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_KILL         | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_SCHEDULE     | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_SIGRETURN    | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_GETKSIG      | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_UMAP         | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_SIGSEND      | 0          | -0       | 0        | 0        | 0               |
++----------------------------+------------+----------+----------+----------+-----------------+
+
+Top IPC calls:
++---------------------------+------------+----------+----------+----------+-----------------+
+| IPC                       | Occurences | Min (ms) | Max (ms) | Avg (ms) | Total time (ms) |
++---------------------------+------------+----------+----------+----------+-----------------+
+| IPC_KTRACE_SENDA          | 112591     | 0        | 24.82    | 24.82    | 10824.43        |
+| IPC_KTRACE_RECEIVE        | 123285     | 0.01     | 20.45    | 20.45    | 5593.37         |
+| IPC_KTRACE_SENDREC        | 39050      | 0.01     | 2.73     | 2.73     | 2274.35         |
+| IPC_KTRACE_SEND           | 940        | 0.01     | 1.86     | 1.86     | 47.46           |
+| IPC_KTRACE_SENDNB         | 122        | 0.01     | 0.09     | 0.09     | 3.10            |
+| IPC_KTRACE_MINIX_KERNINFO | 127        | 0        | 0        | 0        | 0.15            |
+| IPC_KTRACE_NOTIFY         | 0          | -0       | 0        | 0        | 0               |
++---------------------------+------------+----------+----------+----------+-----------------+
+
+################ cpu2 ################
++-------------------+------------+----------+----------+----------+-----------------+
+| Events            | Occurences | Min (ms) | Max (ms) | Avg (ms) | Total time (ms) |
++-------------------+------------+----------+----------+----------+-----------------+
+| BKL wait          | 95139      | 0        | 24       | 24       | 3516.91         |
+| Crit Section dur. | 2          | 0        | 0.09     | 0.09     | 0.26            |
+| Kernel calls      | 125225     | -0       | 24.11    | 24.11    | 10037.40        |
+| IPC               | 398307     | 0        | 19.12    | 19.12    | 17416.60        |
+| Idle time         | 304114     | 0.01     | 1883.44  | 1883.44  | 515975.56       |
+| User time         | 542150     | 0        | 19.46    | 19.46    | 6315.10         |
++-------------------+------------+----------+----------+----------+-----------------+
+BKL+CS+Idle+User:            tot=525807.834 ms
+
+Top kernel calls:
++----------------------------+------------+----------+----------+----------+-----------------+
+| Kernel call                | Occurences | Min (ms) | Max (ms) | Avg (ms) | Total time (ms) |
++----------------------------+------------+----------+----------+----------+-----------------+
+| KC_KTRACE_SYS_SAFECOPYFROM | 57917      | 0.05     | 23.95    | 23.95    | 4920.80         |
+| KC_KTRACE_SYS_VSAFECOPY    | 21530      | 0.09     | 24.11    | 24.11    | 3427.19         |
+| KC_KTRACE_SYS_SAFECOPYTO   | 12616      | 0.05     | 12.99    | 12.99    | 899.66          |
+| KC_KTRACE_SYS_IRQCTL       | 15425      | 0.01     | 11.94    | 11.94    | 368.32          |
+| KC_KTRACE_SYS_UMAP         | 2212       | 0.06     | 0.22     | 0.22     | 199.97          |
+| KC_KTRACE_SYS_DEVIO        | 10183      | 0.01     | 0.12     | 0.12     | 130.42          |
+| KC_KTRACE_SYS_VDEVIO       | 847        | 0.06     | 0.16     | 0.16     | 73.15           |
+| KC_KTRACE_SYS_SETALARM     | 4475       | 0        | 0.14     | 0.14     | 17.30           |
+| KC_KTRACE_SYS_GETINFO      | 10         | 0.03     | 0.07     | 0.07     | 0.43            |
+| KC_KTRACE_SYS_STATECTL     | 5          | 0.03     | 0.03     | 0.03     | 0.14            |
+| KC_KTRACE_SYS_SETGRANT     | 5          | 0        | 0        | 0        | 0.01            |
+| KC_KTRACE_SYS_VTIMER       | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_SCHEDCTL     | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_PRIVCTL      | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_UPDATE       | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_RUNCTL       | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_PADCONF      | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_UMAP_REMOTE  | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_FORK         | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_MEMSET       | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_TIMES        | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_IOPENABLE    | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_DIAGCTL      | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_EXEC         | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_VMCTL        | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_SETTIME      | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_GETMCONTEXT  | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_SDEVIO       | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_ENDKSIG      | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_SETMCONTEXT  | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_SAFEMEMSET   | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_VIRCOPY      | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_VUMAP        | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_TRACE        | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_PHYSCOPY     | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_ABORT        | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_SPROF        | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_READBIOS     | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_STIME        | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_CLEAR        | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_KILL         | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_SCHEDULE     | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_SIGRETURN    | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_GETKSIG      | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_SIGSEND      | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_EXIT         | 0          | -0       | 0        | 0        | 0               |
++----------------------------+------------+----------+----------+----------+-----------------+
+
+Top IPC calls:
++---------------------------+------------+----------+----------+----------+-----------------+
+| IPC                       | Occurences | Min (ms) | Max (ms) | Avg (ms) | Total time (ms) |
++---------------------------+------------+----------+----------+----------+-----------------+
+| IPC_KTRACE_SENDREC        | 215229     | 0.01     | 9.92     | 9.92     | 9382.79         |
+| IPC_KTRACE_RECEIVE        | 101394     | 0        | 12.90    | 12.90    | 3197.91         |
+| IPC_KTRACE_SENDA          | 37348      | 0        | 19.12    | 19.12    | 2976.43         |
+| IPC_KTRACE_SEND           | 43253      | 0.01     | 3.22     | 3.22     | 1831.99         |
+| IPC_KTRACE_SENDNB         | 846        | 0.01     | 0.11     | 0.11     | 26.55           |
+| IPC_KTRACE_NOTIFY         | 61         | 0.01     | 0.03     | 0.03     | 0.74            |
+| IPC_KTRACE_MINIX_KERNINFO | 176        | 0        | 0        | 0        | 0.20            |
++---------------------------+------------+----------+----------+----------+-----------------+
+
+################ cpu3 ################
++-------------------+------------+----------+----------+----------+-----------------+
+| Events            | Occurences | Min (ms) | Max (ms) | Avg (ms) | Total time (ms) |
++-------------------+------------+----------+----------+----------+-----------------+
+| BKL wait          | 14541      | 0        | 0.57     | 0.57     | 222.54          |
+| Crit Section dur. | 2          | 0        | 0.08     | 0.08     | 0.23            |
+| Kernel calls      | 15522      | -0       | 0.72     | 0.72     | 811.94          |
+| IPC               | 71684      | -0       | 2.67     | 2.67     | 2608.05         |
+| Idle time         | 68913      | 0.01     | 30031.96 | 30031.96 | 555822.52       |
+| User time         | 98081      | 0        | 1.28     | 1.28     | 713.48          |
++-------------------+------------+----------+----------+----------+-----------------+
+BKL+CS+Idle+User:            tot=556758.758 ms
+
+Top kernel calls:
++----------------------------+------------+----------+----------+----------+-----------------+
+| Kernel call                | Occurences | Min (ms) | Max (ms) | Avg (ms) | Total time (ms) |
++----------------------------+------------+----------+----------+----------+-----------------+
+| KC_KTRACE_SYS_SAFECOPYTO   | 13770      | 0.04     | 0.61     | 0.61     | 759.08          |
+| KC_KTRACE_SYS_SAFECOPYFROM | 605        | 0.05     | 0.20     | 0.20     | 37.05           |
+| KC_KTRACE_SYS_DEVIO        | 977        | 0.01     | 0.72     | 0.72     | 7.29            |
+| KC_KTRACE_SYS_VIRCOPY      | 127        | 0.03     | 0.13     | 0.13     | 6.97            |
+| KC_KTRACE_SYS_DIAGCTL      | 26         | 0.03     | 0.06     | 0.06     | 1.14            |
+| KC_KTRACE_SYS_STATECTL     | 6          | 0.02     | 0.06     | 0.06     | 0.24            |
+| KC_KTRACE_SYS_GETINFO      | 4          | 0.03     | 0.04     | 0.04     | 0.13            |
+| KC_KTRACE_SYS_PRIVCTL      | 1          | 0.03     | 0.03     | 0.03     | 0.03            |
+| KC_KTRACE_SYS_SETGRANT     | 6          | 0        | 0        | 0        | 0.02            |
+| KC_KTRACE_SYS_VTIMER       | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_SCHEDCTL     | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_UPDATE       | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_RUNCTL       | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_PADCONF      | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_UMAP_REMOTE  | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_FORK         | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_MEMSET       | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_TIMES        | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_IOPENABLE    | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_EXEC         | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_VMCTL        | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_SETTIME      | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_SETALARM     | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_GETMCONTEXT  | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_SDEVIO       | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_ENDKSIG      | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_SETMCONTEXT  | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_VSAFECOPY    | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_SAFEMEMSET   | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_VUMAP        | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_TRACE        | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_PHYSCOPY     | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_IRQCTL       | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_ABORT        | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_SPROF        | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_READBIOS     | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_STIME        | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_CLEAR        | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_VDEVIO       | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_KILL         | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_SCHEDULE     | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_SIGRETURN    | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_GETKSIG      | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_UMAP         | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_SIGSEND      | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_EXIT         | 0          | -0       | 0        | 0        | 0               |
++----------------------------+------------+----------+----------+----------+-----------------+
+
+Top IPC calls:
++---------------------------+------------+----------+----------+----------+-----------------+
+| IPC                       | Occurences | Min (ms) | Max (ms) | Avg (ms) | Total time (ms) |
++---------------------------+------------+----------+----------+----------+-----------------+
+| IPC_KTRACE_SENDREC        | 38022      | 0.01     | 2.67     | 2.67     | 1872.45         |
+| IPC_KTRACE_SEND           | 16702      | 0.01     | 2.36     | 2.36     | 499.10          |
+| IPC_KTRACE_RECEIVE        | 16779      | 0.01     | 0.95     | 0.95     | 233.52          |
+| IPC_KTRACE_SENDNB         | 71         | 0.01     | 0.05     | 0.05     | 2.76            |
+| IPC_KTRACE_MINIX_KERNINFO | 106        | 0        | 0        | 0        | 0.12            |
+| IPC_KTRACE_SENDA          | 4          | 0        | 0.06     | 0.06     | 0.09            |
+| IPC_KTRACE_NOTIFY         | 0          | -0       | 0        | 0        | 0               |
++---------------------------+------------+----------+----------+----------+-----------------+
+
+################ cpu4 ################
++-------------------+------------+----------+----------+----------+-----------------+
+| Events            | Occurences | Min (ms) | Max (ms) | Avg (ms) | Total time (ms) |
++-------------------+------------+----------+----------+----------+-----------------+
+| BKL wait          | 34324      | 0        | 17.15    | 17.15    | 979.31          |
+| Crit Section dur. | 2          | 0        | 0.09     | 0.09     | 0.26            |
+| Kernel calls      | 40259      | -0       | 17.25    | 17.25    | 2658.06         |
+| IPC               | 226315     | -0       | 15.70    | 15.70    | 10252.69        |
+| Idle time         | 199457     | 0.02     | 6023.55  | 6023.55  | 542514.54       |
+| User time         | 275902     | 0        | 12.70    | 12.70    | 1984.74         |
++-------------------+------------+----------+----------+----------+-----------------+
+BKL+CS+Idle+User:            tot=545478.853 ms
+
+Top kernel calls:
++----------------------------+------------+----------+----------+----------+-----------------+
+| Kernel call                | Occurences | Min (ms) | Max (ms) | Avg (ms) | Total time (ms) |
++----------------------------+------------+----------+----------+----------+-----------------+
+| KC_KTRACE_SYS_SAFECOPYFROM | 16265      | 0.05     | 16.94    | 16.94    | 1187.43         |
+| KC_KTRACE_SYS_SAFECOPYTO   | 15343      | 0.04     | 0.39     | 0.39     | 857             |
+| KC_KTRACE_SYS_VSAFECOPY    | 2694       | 0.09     | 17.25    | 17.25    | 530.38          |
+| KC_KTRACE_SYS_IRQCTL       | 1802       | 0.01     | 0.17     | 0.17     | 41.24           |
+| KC_KTRACE_SYS_DEVIO        | 3673       | 0.01     | 0.80     | 0.80     | 39.45           |
+| KC_KTRACE_SYS_SETALARM     | 450        | 0        | 0.07     | 0.07     | 1.60            |
+| KC_KTRACE_SYS_STATECTL     | 8          | 0.02     | 0.13     | 0.13     | 0.39            |
+| KC_KTRACE_SYS_GETINFO      | 7          | 0.03     | 0.05     | 0.05     | 0.26            |
+| KC_KTRACE_SYS_PRIVCTL      | 4          | 0.04     | 0.08     | 0.08     | 0.22            |
+| KC_KTRACE_SYS_DIAGCTL      | 1          | 0.06     | 0.06     | 0.06     | 0.06            |
+| KC_KTRACE_SYS_SETGRANT     | 12         | 0        | 0        | 0        | 0.03            |
+| KC_KTRACE_SYS_VTIMER       | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_SCHEDCTL     | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_UPDATE       | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_RUNCTL       | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_PADCONF      | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_UMAP_REMOTE  | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_FORK         | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_MEMSET       | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_TIMES        | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_IOPENABLE    | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_EXEC         | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_VMCTL        | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_SETTIME      | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_GETMCONTEXT  | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_SDEVIO       | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_ENDKSIG      | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_SETMCONTEXT  | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_SAFEMEMSET   | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_VIRCOPY      | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_VUMAP        | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_TRACE        | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_PHYSCOPY     | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_ABORT        | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_SPROF        | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_READBIOS     | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_STIME        | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_CLEAR        | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_VDEVIO       | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_KILL         | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_SCHEDULE     | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_SIGRETURN    | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_GETKSIG      | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_UMAP         | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_SIGSEND      | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_EXIT         | 0          | -0       | 0        | 0        | 0               |
++----------------------------+------------+----------+----------+----------+-----------------+
+
+Top IPC calls:
++---------------------------+------------+----------+----------+----------+-----------------+
+| IPC                       | Occurences | Min (ms) | Max (ms) | Avg (ms) | Total time (ms) |
++---------------------------+------------+----------+----------+----------+-----------------+
+| IPC_KTRACE_SENDREC        | 152008     | 0.01     | 15.70    | 15.70    | 8137.98         |
+| IPC_KTRACE_SEND           | 31284      | 0.01     | 3.94     | 3.94     | 954.40          |
+| IPC_KTRACE_RECEIVE        | 38212      | 0.01     | 11.95    | 11.95    | 825.94          |
+| IPC_KTRACE_SENDA          | 4565       | 0        | 9.74     | 9.74     | 332.54          |
+| IPC_KTRACE_NOTIFY         | 106        | 0.01     | 0.08     | 0.08     | 1.68            |
+| IPC_KTRACE_MINIX_KERNINFO | 140        | 0        | 0        | 0        | 0.16            |
+| IPC_KTRACE_SENDNB         | 0          | -0       | 0        | 0        | 0               |
++---------------------------+------------+----------+----------+----------+-----------------+
+
+################ cpu5 ################
++-------------------+------------+----------+----------+----------+-----------------+
+| Events            | Occurences | Min (ms) | Max (ms) | Avg (ms) | Total time (ms) |
++-------------------+------------+----------+----------+----------+-----------------+
+| BKL wait          | 856        | 0        | 11.74    | 11.74    | 26.32           |
+| Crit Section dur. | 2          | 0        | 0.09     | 0.09     | 0.26            |
+| Kernel calls      | 6409       | -0       | 11.79    | 11.79    | 108.18          |
+| IPC               | 113697     | 0        | 16.46    | 16.46    | 5716.93         |
+| Idle time         | 121522     | 0.02     | 4052.83  | 4052.83  | 566003.77       |
+| User time         | 128513     | 0        | 2.05     | 2.05     | 1356.18         |
++-------------------+------------+----------+----------+----------+-----------------+
+BKL+CS+Idle+User:            tot=567386.532 ms
+
+Top kernel calls:
++----------------------------+------------+----------+----------+----------+-----------------+
+| Kernel call                | Occurences | Min (ms) | Max (ms) | Avg (ms) | Total time (ms) |
++----------------------------+------------+----------+----------+----------+-----------------+
+| KC_KTRACE_SYS_SAFECOPYFROM | 742        | 0.05     | 11.79    | 11.79    | 66.08           |
+| KC_KTRACE_SYS_DEVIO        | 5474       | 0.01     | 0.02     | 0.02     | 36.04           |
+| KC_KTRACE_SYS_GETINFO      | 78         | 0.02     | 0.13     | 0.13     | 3.79            |
+| KC_KTRACE_SYS_SAFECOPYTO   | 23         | 0.05     | 0.10     | 0.10     | 1.47            |
+| KC_KTRACE_SYS_SETALARM     | 73         | 0        | 0.07     | 0.07     | 0.34            |
+| KC_KTRACE_SYS_STATECTL     | 8          | 0.02     | 0.06     | 0.06     | 0.27            |
+| KC_KTRACE_SYS_READBIOS     | 2          | 0.04     | 0.08     | 0.08     | 0.12            |
+| KC_KTRACE_SYS_VIRCOPY      | 1          | 0.04     | 0.04     | 0.04     | 0.04            |
+| KC_KTRACE_SYS_SETGRANT     | 8          | 0        | 0        | 0        | 0.02            |
+| KC_KTRACE_SYS_VTIMER       | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_SCHEDCTL     | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_PRIVCTL      | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_UPDATE       | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_RUNCTL       | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_PADCONF      | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_UMAP_REMOTE  | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_FORK         | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_MEMSET       | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_TIMES        | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_IOPENABLE    | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_DIAGCTL      | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_EXEC         | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_VMCTL        | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_SETTIME      | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_GETMCONTEXT  | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_SDEVIO       | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_ENDKSIG      | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_SETMCONTEXT  | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_VSAFECOPY    | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_SAFEMEMSET   | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_VUMAP        | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_TRACE        | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_PHYSCOPY     | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_IRQCTL       | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_ABORT        | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_SPROF        | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_STIME        | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_CLEAR        | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_VDEVIO       | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_KILL         | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_SCHEDULE     | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_SIGRETURN    | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_GETKSIG      | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_UMAP         | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_SIGSEND      | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_EXIT         | 0          | -0       | 0        | 0        | 0               |
++----------------------------+------------+----------+----------+----------+-----------------+
+
+Top IPC calls:
++---------------------------+------------+----------+----------+----------+-----------------+
+| IPC                       | Occurences | Min (ms) | Max (ms) | Avg (ms) | Total time (ms) |
++---------------------------+------------+----------+----------+----------+-----------------+
+| IPC_KTRACE_SENDREC        | 112592     | 0.01     | 16.46    | 16.46    | 5670.08         |
+| IPC_KTRACE_SENDA          | 275        | 0        | 0.48     | 0.48     | 25.68           |
+| IPC_KTRACE_NOTIFY         | 199        | 0.01     | 7.57     | 7.57     | 12.12           |
+| IPC_KTRACE_RECEIVE        | 551        | 0.01     | 0.10     | 0.10     | 8.92            |
+| IPC_KTRACE_MINIX_KERNINFO | 78         | 0        | 0        | 0        | 0.09            |
+| IPC_KTRACE_SENDNB         | 1          | 0.03     | 0.03     | 0.03     | 0.03            |
+| IPC_KTRACE_SEND           | 1          | 0.01     | 0.01     | 0.01     | 0.01            |
++---------------------------+------------+----------+----------+----------+-----------------+
+
+################ cpu6 ################
++-------------------+------------+----------+----------+----------+-----------------+
+| Events            | Occurences | Min (ms) | Max (ms) | Avg (ms) | Total time (ms) |
++-------------------+------------+----------+----------+----------+-----------------+
+| BKL wait          | 7          | 0        | 0.04     | 0.04     | 0.13            |
+| Crit Section dur. | 2          | 0        | 0.09     | 0.09     | 0.27            |
+| Kernel calls      | 67         | -0       | 0.05     | 0.05     | 0.87            |
+| IPC               | 69888      | -0       | 24.24    | 24.24    | 4836.09         |
+| Idle time         | 76155      | 0.02     | 3066.45  | 3066.45  | 569182.29       |
+| User time         | 76657      | 0        | 8.31     | 8.31     | 1010.43         |
++-------------------+------------+----------+----------+----------+-----------------+
+BKL+CS+Idle+User:            tot=570193.121 ms
+
+Top kernel calls:
++----------------------------+------------+----------+----------+----------+-----------------+
+| Kernel call                | Occurences | Min (ms) | Max (ms) | Avg (ms) | Total time (ms) |
++----------------------------+------------+----------+----------+----------+-----------------+
+| KC_KTRACE_SYS_DEVIO        | 56         | 0.01     | 0.02     | 0.02     | 0.53            |
+| KC_KTRACE_SYS_GETINFO      | 3          | 0.03     | 0.05     | 0.05     | 0.13            |
+| KC_KTRACE_SYS_IRQCTL       | 4          | 0.02     | 0.05     | 0.05     | 0.13            |
+| KC_KTRACE_SYS_STATECTL     | 2          | 0.03     | 0.05     | 0.05     | 0.08            |
+| KC_KTRACE_SYS_SETGRANT     | 2          | 0        | 0        | 0        | 0.01            |
+| KC_KTRACE_SYS_VTIMER       | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_SCHEDCTL     | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_PRIVCTL      | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_UPDATE       | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_RUNCTL       | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_PADCONF      | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_UMAP_REMOTE  | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_FORK         | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_MEMSET       | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_TIMES        | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_IOPENABLE    | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_DIAGCTL      | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_EXEC         | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_VMCTL        | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_SETTIME      | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_SETALARM     | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_GETMCONTEXT  | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_SDEVIO       | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_ENDKSIG      | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_SAFECOPYTO   | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_SETMCONTEXT  | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_VSAFECOPY    | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_SAFEMEMSET   | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_VIRCOPY      | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_VUMAP        | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_TRACE        | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_PHYSCOPY     | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_ABORT        | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_SAFECOPYFROM | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_SPROF        | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_READBIOS     | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_STIME        | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_CLEAR        | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_VDEVIO       | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_KILL         | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_SCHEDULE     | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_SIGRETURN    | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_GETKSIG      | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_UMAP         | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_SIGSEND      | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_EXIT         | 0          | -0       | 0        | 0        | 0               |
++----------------------------+------------+----------+----------+----------+-----------------+
+
+Top IPC calls:
++---------------------------+------------+----------+----------+----------+-----------------+
+| IPC                       | Occurences | Min (ms) | Max (ms) | Avg (ms) | Total time (ms) |
++---------------------------+------------+----------+----------+----------+-----------------+
+| IPC_KTRACE_SENDREC        | 69714      | 0.01     | 24.24    | 24.24    | 4835.75         |
+| IPC_KTRACE_MINIX_KERNINFO | 165        | 0        | 0        | 0        | 0.19            |
+| IPC_KTRACE_RECEIVE        | 8          | 0.01     | 0.05     | 0.05     | 0.15            |
+| IPC_KTRACE_SENDA          | 1          | 0        | 0        | 0        | 0               |
+| IPC_KTRACE_SEND           | 0          | -0       | 0        | 0        | 0               |
+| IPC_KTRACE_SENDNB         | 0          | -0       | 0        | 0        | 0               |
+| IPC_KTRACE_NOTIFY         | 0          | -0       | 0        | 0        | 0               |
++---------------------------+------------+----------+----------+----------+-----------------+
+
+################ cpu7 ################
++-------------------+------------+----------+----------+----------+-----------------+
+| Events            | Occurences | Min (ms) | Max (ms) | Avg (ms) | Total time (ms) |
++-------------------+------------+----------+----------+----------+-----------------+
+| BKL wait          | 329313     | 0        | 25.02    | 25.02    | 5744.76         |
+| Crit Section dur. | 2          | 0        | 0.09     | 0.09     | 0.24            |
+| Kernel calls      | 412760     | -0       | 25.06    | 25.06    | 22753.29        |
+| IPC               | 691391     | 0        | 16.97    | 16.97    | 19506.27        |
+| Idle time         | 460018     | 0.02     | 2881.59  | 2881.59  | 478488.39       |
+| User time         | 1116474    | 0        | 16.08    | 16.08    | 6613.19         |
++-------------------+------------+----------+----------+----------+-----------------+
+BKL+CS+Idle+User:            tot=490846.577 ms
+
+Top kernel calls:
++----------------------------+------------+----------+----------+----------+-----------------+
+| Kernel call                | Occurences | Min (ms) | Max (ms) | Avg (ms) | Total time (ms) |
++----------------------------+------------+----------+----------+----------+-----------------+
+| KC_KTRACE_SYS_SAFECOPYFROM | 199133     | 0.05     | 25.06    | 25.06    | 12498.75        |
+| KC_KTRACE_SYS_UMAP         | 59529      | 0.05     | 19.51    | 19.51    | 4529.98         |
+| KC_KTRACE_SYS_SAFECOPYTO   | 62397      | 0.05     | 23.69    | 23.69    | 3817.61         |
+| KC_KTRACE_SYS_DEVIO        | 74538      | 0.01     | 0.88     | 0.88     | 950.49          |
+| KC_KTRACE_SYS_VDEVIO       | 6006       | 0.06     | 12.25    | 12.25    | 578.66          |
+| KC_KTRACE_SYS_VSAFECOPY    | 2236       | 0.09     | 11.97    | 11.97    | 310.79          |
+| KC_KTRACE_SYS_SETALARM     | 7583       | 0        | 0.15     | 0.15     | 34.87           |
+| KC_KTRACE_SYS_IRQCTL       | 1324       | 0.01     | 0.31     | 0.31     | 31.69           |
+| KC_KTRACE_SYS_GETINFO      | 6          | 0.03     | 0.05     | 0.05     | 0.24            |
+| KC_KTRACE_SYS_SETGRANT     | 4          | 0        | 0.10     | 0.10     | 0.10            |
+| KC_KTRACE_SYS_STATECTL     | 4          | 0.02     | 0.03     | 0.03     | 0.10            |
+| KC_KTRACE_SYS_VTIMER       | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_SCHEDCTL     | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_PRIVCTL      | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_UPDATE       | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_RUNCTL       | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_PADCONF      | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_UMAP_REMOTE  | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_FORK         | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_MEMSET       | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_TIMES        | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_IOPENABLE    | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_DIAGCTL      | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_EXEC         | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_VMCTL        | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_SETTIME      | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_GETMCONTEXT  | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_SDEVIO       | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_ENDKSIG      | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_SETMCONTEXT  | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_SAFEMEMSET   | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_VIRCOPY      | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_VUMAP        | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_TRACE        | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_PHYSCOPY     | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_ABORT        | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_SPROF        | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_READBIOS     | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_STIME        | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_CLEAR        | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_KILL         | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_SCHEDULE     | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_SIGRETURN    | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_GETKSIG      | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_SIGSEND      | 0          | -0       | 0        | 0        | 0               |
+| KC_KTRACE_SYS_EXIT         | 0          | -0       | 0        | 0        | 0               |
++----------------------------+------------+----------+----------+----------+-----------------+
+
+Top IPC calls:
++---------------------------+------------+----------+----------+----------+-----------------+
+| IPC                       | Occurences | Min (ms) | Max (ms) | Avg (ms) | Total time (ms) |
++---------------------------+------------+----------+----------+----------+-----------------+
+| IPC_KTRACE_SENDREC        | 200256     | 0.01     | 2.31     | 2.31     | 8364.26         |
+| IPC_KTRACE_SEND           | 232087     | 0.01     | 16.97    | 16.97    | 6882.42         |
+| IPC_KTRACE_RECEIVE        | 249817     | 0.01     | 13.22    | 13.22    | 3864.11         |
+| IPC_KTRACE_SENDA          | 3584       | 0        | 0.43     | 0.43     | 216.66          |
+| IPC_KTRACE_SENDNB         | 5212       | 0.01     | 0.15     | 0.15     | 177.83          |
+| IPC_KTRACE_NOTIFY         | 27         | 0.01     | 0.09     | 0.09     | 0.52            |
+| IPC_KTRACE_MINIX_KERNINFO | 408        | 0        | 0        | 0        | 0.47            |
++---------------------------+------------+----------+----------+----------+-----------------+
+

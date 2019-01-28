@@ -71,6 +71,7 @@ int verify_grant(
 			return(EINVAL);
 		}
 		granter_proc = proc_addr(proc_nr);
+		assert(proc_locked(granter_proc));
 
 		/* If the granter has a temporary grant table, always allow
 		 * requests with unspecified access and return ENOTREADY if
@@ -286,6 +287,8 @@ static int safecopy(
 	endpoint_t new_granter, *src, *dst;
 	int r;
 	struct cp_sfinfo sfinfo;
+
+	assert(proc_locked(caller));
 
 	if(granter == NONE || grantee == NONE) {
 		printf("safecopy: nonsense processes\n");

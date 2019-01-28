@@ -140,6 +140,7 @@ static phys_bytes createpde(
 static int check_resumed_caller(struct proc *caller)
 {
 	/* Returns the result from VM if caller was resumed, otherwise OK. */
+	assert(proc_locked(caller));
 	if (caller && (caller->p_misc_flags & MF_KCALL_RESUME)) {
 		assert(caller->p_vmrequest.vmresult != VMSUSPEND);
 		return caller->p_vmrequest.vmresult;
@@ -156,6 +157,9 @@ static int lin_lin_copy(struct proc *srcproc, vir_bytes srclinaddr,
 {
 	u32_t addr;
 	proc_nr_t procslot;
+
+	assert(proc_locked(srcproc));
+	assert(proc_locked(dstproc));
 
 	assert(get_cpulocal_var(ptproc));
 	assert(get_cpulocal_var(proc_ptr));
@@ -334,6 +338,7 @@ int vm_lookup(const struct proc *proc, const vir_bytes virtual,
 	int pde, pte;
 	u32_t pde_v, pte_v;
 
+	assert(proc_locked(proc));
 	assert(proc);
 	assert(physical);
 	assert(!isemptyp(proc));
@@ -394,6 +399,7 @@ size_t vm_lookup_range(const struct proc *proc, vir_bytes vir_addr,
 	phys_bytes phys, next_phys;
 	size_t len;
 
+	assert(proc_locked(proc));
 	assert(proc);
 	assert(bytes > 0);
 	assert(HASPT(proc));
@@ -442,6 +448,8 @@ int vm_check_range(struct proc *caller, struct proc *target,
 	 */
 	int r;
 
+	assert(proc_locked(caller));
+	assert(proc_locked(target));
 	if ((caller->p_misc_flags & MF_KCALL_RESUME) &&
 			(r = caller->p_vmrequest.vmresult) != OK)
 		return r;
@@ -607,6 +615,8 @@ int virtual_copy_f(
   int i, r;
   struct proc *procs[2];
 
+  assert(proc_locked(caller));
+
   assert((vmcheck && caller) || (!vmcheck && !caller));
 
   /* Check copy count. */
@@ -632,6 +642,7 @@ int virtual_copy_f(
 	}
 
 	procs[i] = p;
+	assert(proc_locked(p));
   }
 
   if ((r = check_resumed_caller(caller)) != OK)

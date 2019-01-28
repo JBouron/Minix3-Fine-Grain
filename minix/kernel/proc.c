@@ -257,6 +257,8 @@ void vm_suspend(struct proc *caller, const struct proc *target,
         /* This range is not OK for this process. Set parameters
          * of the request and notify VM about the pending request.
          */
+	assert(proc_locked(caller));
+	assert(proc_locked(target));
         assert(!RTS_ISSET(caller, RTS_VMREQUEST));
         assert(!RTS_ISSET(target, RTS_VMREQUEST));
 
@@ -2537,14 +2539,24 @@ void unlock_proc(struct proc *p)
 	spinlock_unlock(&(p->p_lock.lock));
 }
 
-int proc_locked(struct proc *p)
+int proc_locked(const struct proc *p)
 {
-	return p->p_lock.lock.val==1&&p->p_lock.owner==cpuid;
+	if(!p)
+		return 1;
+	else if(p->p_endpoint==-1)
+		return 1;
+	else
+		return (p->p_lock.lock.val==1&&p->p_lock.owner==cpuid);
 }
 
-int proc_locked_borrow(struct proc *p)
+int proc_locked_borrow(const struct proc *p)
 {
-	return p->p_lock.lock.val==1&&p->p_lock.owner!=cpuid;
+	if(!p)
+		return 1;
+	else if(p->p_endpoint==-1)
+		return 1;
+	else
+		return (p->p_lock.lock.val==1&&p->p_lock.owner!=cpuid);
 }
 
 void lock_two_procs(struct proc *p1,struct proc *p2)
