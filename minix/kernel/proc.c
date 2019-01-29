@@ -2541,9 +2541,11 @@ void unlock_proc(struct proc *p)
 
 int proc_locked(const struct proc *p)
 {
+	/* Assert if a proc is locked by the current cpu.
+	 * We don't need to lock pseudo processes. */
 	if(!p)
 		return 1;
-	else if(p->p_endpoint==-1)
+	else if(p->p_endpoint==KERNEL||p->p_endpoint==SYSTEM)
 		return 1;
 	else
 		return (p->p_lock.lock.val==1&&p->p_lock.owner==cpuid);
@@ -2551,9 +2553,11 @@ int proc_locked(const struct proc *p)
 
 int proc_locked_borrow(const struct proc *p)
 {
+	/* Assert if a proc is locked by a remote cpu.
+	 * We don't need to lock pseudo processes. */
 	if(!p)
 		return 1;
-	else if(p->p_endpoint==-1)
+	else if(p->p_endpoint==KERNEL||p->p_endpoint==SYSTEM)
 		return 1;
 	else
 		return (p->p_lock.lock.val==1&&p->p_lock.owner!=cpuid);

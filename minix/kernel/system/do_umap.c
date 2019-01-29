@@ -31,9 +31,16 @@ int do_umap(struct proc * caller, message * m_ptr)
    * in the caller's address space and grants where the caller is specified as
    * grantee; after the security check we simply invoke do_umap_remote
    */
-  if (seg_index != MEM_GRANT && endpt != SELF) return EPERM;
-  m_ptr->m_lsys_krn_sys_umap.dst_endpt = SELF;
-  return do_umap_remote(caller, m_ptr);
+  if (seg_index != MEM_GRANT && endpt != SELF) {
+	  lock_proc(caller);
+	  return EPERM;
+  } else {
+	  m_ptr->m_lsys_krn_sys_umap.dst_endpt = SELF;
+	  /* do_umap_remote will acquire the lock on caller for us, and won't
+	   * release it, because do_umap_remote is smart ... be like
+	   * do_umap_remote. */
+	  return do_umap_remote(caller, m_ptr);
+  }
 }
 
 #endif /* USE_UMAP */

@@ -126,6 +126,8 @@ static int is_kernel_call_optimized(int call_nr)
 		SYS_SAFECOPYFROM,
 		SYS_SAFECOPYTO,
 		SYS_VSAFECOPY,
+		SYS_UMAP,
+		SYS_UMAP_REMOTE,
 		/* Add optimized calls to the list ... */
 	};
 	for(i=0;

@@ -1,13 +1,13 @@
 # Below is the list of kernel calls performed at boot.
 
 O | KC_KTRACE_SYS_VMCTL        | 388076     | 
-  | KC_KTRACE_SYS_SAFECOPYTO   | 34138      | Fix pdes in data_copy
-  | KC_KTRACE_SYS_SAFECOPYFROM | 21725      | Fix pdes in data_copy
+O | KC_KTRACE_SYS_SAFECOPYTO   | 34138      | Fix pdes in data_copy
+O | KC_KTRACE_SYS_SAFECOPYFROM | 21725      | Fix pdes in data_copy
   | KC_KTRACE_SYS_MEMSET       | 27391      | Fix pdes in data_copy
-  | KC_KTRACE_SYS_VIRCOPY      | 16211      | Fix pdes in data_copy
+O | KC_KTRACE_SYS_VIRCOPY      | 16211      | Fix pdes in data_copy
 O | KC_KTRACE_SYS_DEVIO        | 61115      | 
-  | KC_KTRACE_SYS_UMAP         | 7191       | Fix pdes in data_copy
-  | KC_KTRACE_SYS_PHYSCOPY     | 7952       | Fix pdes in data_copy
+O | KC_KTRACE_SYS_UMAP         | 7191       | Fix pdes in data_copy
+O | KC_KTRACE_SYS_PHYSCOPY     | 7952       | Fix pdes in data_copy
 O | KC_KTRACE_SYS_SETALARM     | 5869       | 
   | KC_KTRACE_SYS_VDEVIO       | 2460       | Fix pdes in data_copy
 O | KC_KTRACE_SYS_SCHEDULE     | 695        | 
@@ -18,7 +18,7 @@ O | KC_KTRACE_SYS_FORK         | 670        |
 O | KC_KTRACE_SYS_TIMES        | 638        | 
 O | KC_KTRACE_SYS_RUNCTL       | 640        | 
 O | KC_KTRACE_SYS_SCHEDCTL     | 691        | 
-  | KC_KTRACE_SYS_VSAFECOPY    | 80         | Fix pdes in data_copy
+O | KC_KTRACE_SYS_VSAFECOPY    | 80         | Fix pdes in data_copy
   | KC_KTRACE_SYS_PRIVCTL      | 109        | Fix pdes in data_copy
 O | KC_KTRACE_SYS_SETGRANT     | 83         | 
   | KC_KTRACE_SYS_STATECTL     | 69         | Clr IPC, data_copy
@@ -32,14 +32,14 @@ O | KC_KTRACE_SYS_ENDKSIG      | 2          |
 O | KC_KTRACE_SYS_EXIT         | 2          | 
   | KC_KTRACE_SYS_SIGSEND      | 1          | data_copy
   | KC_KTRACE_SYS_SIGRETURN    | 1          | Fix pdes in data_copy
-0 | KC_KTRACE_SYS_STIME        | 1          | 
+O | KC_KTRACE_SYS_STIME        | 1          | 
   | KC_KTRACE_SYS_SAFEMEMSET   | 0          | data_copy
 O | KC_KTRACE_SYS_IOPENABLE    | 0          | 
   | KC_KTRACE_SYS_UPDATE       | 0          | Fix pdes in data_copy
 O | KC_KTRACE_SYS_ABORT        | 0          | 
   | KC_KTRACE_SYS_SETMCONTEXT  | 0          | Fix pdes in data_copy
   | KC_KTRACE_SYS_VUMAP        | 0          | Fix pdes in data_copy
-  | KC_KTRACE_SYS_UMAP_REMOTE  | 0          | data_copy
+O | KC_KTRACE_SYS_UMAP_REMOTE  | 0          | data_copy
   | KC_KTRACE_SYS_TRACE        | 0          | data_copy (ALSO DISABLED ??)
   | KC_KTRACE_SYS_SPROF        | 0          | Fix pdes in data_copy
   | KC_KTRACE_SYS_GETMCONTEXT  | 0          | data_copy
