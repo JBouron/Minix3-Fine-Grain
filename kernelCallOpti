@@ -9,20 +9,20 @@ O | KC_KTRACE_SYS_DEVIO        | 61115      |
 O | KC_KTRACE_SYS_UMAP         | 7191       | Fix pdes in data_copy
 O | KC_KTRACE_SYS_PHYSCOPY     | 7952       | Fix pdes in data_copy
 O | KC_KTRACE_SYS_SETALARM     | 5869       | 
-  | KC_KTRACE_SYS_VDEVIO       | 2460       | Fix pdes in data_copy
+O | KC_KTRACE_SYS_VDEVIO       | 2460       | Fix pdes in data_copy
 O | KC_KTRACE_SYS_SCHEDULE     | 695        | 
 O | KC_KTRACE_SYS_FORK         | 670        | 
-  | KC_KTRACE_SYS_EXEC         | 612        | Fix pdes in data_copy
+O | KC_KTRACE_SYS_EXEC         | 612        | Fix pdes in data_copy
   | KC_KTRACE_SYS_CLEAR        | 638        | Hard AF, lock hell.
-  | KC_KTRACE_SYS_GETINFO      | 444        | Fix data_copy_vmcheck.
+O | KC_KTRACE_SYS_GETINFO      | 444        | Fix data_copy_vmcheck.
 O | KC_KTRACE_SYS_TIMES        | 638        | 
 O | KC_KTRACE_SYS_RUNCTL       | 640        | 
 O | KC_KTRACE_SYS_SCHEDCTL     | 691        | 
 O | KC_KTRACE_SYS_VSAFECOPY    | 80         | Fix pdes in data_copy
-  | KC_KTRACE_SYS_PRIVCTL      | 109        | Fix pdes in data_copy
+  | KC_KTRACE_SYS_PRIVCTL      | 109        | Fix pdes in data_copy Clear IPC refs
 O | KC_KTRACE_SYS_SETGRANT     | 83         | 
   | KC_KTRACE_SYS_STATECTL     | 69         | Clr IPC, data_copy
-  | KC_KTRACE_SYS_DIAGCTL      | 29         | data_copy
+O | KC_KTRACE_SYS_DIAGCTL      | 29         | data_copy
 O | KC_KTRACE_SYS_IRQCTL       | 21         | 
   | KC_KTRACE_SYS_READBIOS     | 6          | virt_copy
 O | KC_KTRACE_SYS_GETKSIG      | 10         | 

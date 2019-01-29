@@ -18,13 +18,14 @@
 int do_diagctl(struct proc * caller, message * m_ptr)
 {
   vir_bytes len, buf;
-  static char mybuf[DIAG_BUFSIZE];
+  char mybuf[DIAG_BUFSIZE];
   int s, i, proc_nr;
 
   switch (m_ptr->m_lsys_krn_sys_diagctl.code) {
     case DIAGCTL_CODE_DIAG:
         buf = m_ptr->m_lsys_krn_sys_diagctl.buf;
         len = m_ptr->m_lsys_krn_sys_diagctl.len;
+	lock_proc(caller);
 	if(len < 1 || len > DIAG_BUFSIZE) {
 		printf("do_diagctl: diag for %d: len %d out of range\n",
 			caller->p_endpoint, len);
@@ -41,11 +42,19 @@ int do_diagctl(struct proc * caller, message * m_ptr)
 	kputc(END_OF_KMESS);
 	return OK;
     case DIAGCTL_CODE_STACKTRACE:
-	if(!isokendpt(m_ptr->m_lsys_krn_sys_diagctl.endpt, &proc_nr))
+	if(!isokendpt(m_ptr->m_lsys_krn_sys_diagctl.endpt, &proc_nr)) {
+		lock_proc(caller);
 		return EINVAL;
-	proc_stacktrace(proc_addr(proc_nr));
-	return OK;
+	} else {
+		struct proc *rp = proc_addr(proc_nr);
+		lock_proc(rp);
+		proc_stacktrace(rp);
+		unlock_proc(rp);
+		lock_proc(caller);
+		return OK;
+	}
     case DIAGCTL_CODE_REGISTER:
+	lock_proc(caller);
 	if (!(priv(caller)->s_flags & SYS_PROC))
 		return EPERM;
 	priv(caller)->s_diag_sig = TRUE;
@@ -56,11 +65,13 @@ int do_diagctl(struct proc * caller, message * m_ptr)
 		send_sig_deferred(caller->p_endpoint, SIGKMESS);
 	return OK;
     case DIAGCTL_CODE_UNREGISTER:
+	lock_proc(caller);
 	if (!(priv(caller)->s_flags & SYS_PROC))
 		return EPERM;
 	priv(caller)->s_diag_sig = FALSE;
 	return OK;
     default:
+	lock_proc(caller);
 	printf("do_diagctl: invalid request %d\n", m_ptr->m_lsys_krn_sys_diagctl.code);
         return(EINVAL);
   }

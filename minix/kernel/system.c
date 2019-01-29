@@ -132,6 +132,8 @@ static int is_kernel_call_optimized(int call_nr)
 		SYS_SAFEMEMSET,
 		SYS_VDEVIO,
 		SYS_EXEC,
+		SYS_GETINFO,
+		SYS_DIAGCTL,
 		/* Add optimized calls to the list ... */
 	};
 	for(i=0;

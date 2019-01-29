@@ -56,6 +56,10 @@ int do_getinfo(struct proc * caller, message * m_ptr)
   struct proc *p;
   struct rusage r_usage;
 
+  /* This is not 100% atomic, but this call is rarely used so we don't really
+   * care that much. */
+  lock_proc(caller);
+
   /* Set source address and length based on request type. */
   switch (m_ptr->m_lsys_krn_sys_getinfo.request) {
     case GET_MACHINE: {
