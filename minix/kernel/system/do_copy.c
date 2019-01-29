@@ -51,6 +51,7 @@ int do_copy(struct proc * caller, message * m_ptr)
 		if (vir_addr[i].proc_nr_e != NONE) {
 			if(! isokendpt(vir_addr[i].proc_nr_e, &p)) {
 				printf("do_copy: %d: %d not ok endpoint\n", i, vir_addr[i].proc_nr_e);
+				lock_proc(caller);
 				return(EINVAL); 
 			} else {
 				procs[i] = proc_addr(p);
