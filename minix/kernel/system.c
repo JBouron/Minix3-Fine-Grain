@@ -122,7 +122,10 @@ static int is_kernel_call_optimized(int call_nr)
 		SYS_SETTIME,
 		SYS_VTIMER,
 		SYS_PHYSCOPY,
-		SYS_VIRCOPY
+		SYS_VIRCOPY,
+		SYS_SAFECOPYFROM,
+		SYS_SAFECOPYTO,
+		SYS_VSAFECOPY,
 		/* Add optimized calls to the list ... */
 	};
 	for(i=0;

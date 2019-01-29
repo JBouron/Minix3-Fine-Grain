@@ -2679,3 +2679,13 @@ void unlock_three_procs(struct proc *p1,struct proc *p2,struct proc *p3)
 {
 	unlock_four_procs(p1,p2,p3,NULL);
 }
+
+struct proc *proc_for_endpoint(endpoint_t endpt)
+{
+	int proc_nr;
+	if(!isokendpt(endpt, &proc_nr)) {
+		panic("Invalid enpoint in proc_for_endpoint");
+	} else {
+		return proc_addr(proc_nr);
+	}
+}

@@ -364,6 +364,12 @@ void unlock_four_procs(struct proc *p1,struct proc *p2,struct proc *p3,struct pr
 
 void lock_three_procs(struct proc *p1,struct proc *p2,struct proc *p3);
 void unlock_three_procs(struct proc *p1,struct proc *p2,struct proc *p3);
+
+/* Get the proc struc corresponding to an endpoint.
+ * This function will panic if the endpoint is not ok, so check your endpoints,
+ * or not, I'm not your father. */
+struct proc *proc_for_endpoint(endpoint_t endpt);
+
 #endif /* __ASSEMBLY__ */
 
 #endif /* PROC_H */

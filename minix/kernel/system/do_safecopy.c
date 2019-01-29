@@ -147,29 +147,16 @@ int verify_grant(
 		 * to a chain of indirect grants which must be followed back.
 		 */
 		if((g.cp_flags & CPF_INDIRECT)) {
-			/* Stop after a few iterations. There may be a loop. */
-			if (depth == MAX_INDIRECT_DEPTH) {
-				printf(
-					"verify grant: indirect grant verify "
-					"failed: exceeded maximum depth\n");
-				return ELOOP;
-			}
-			depth++;
-
-			/* Verify actual grantee. */
-			if(g.cp_u.cp_indirect.cp_who_to != grantee &&
-				grantee != ANY &&
-				g.cp_u.cp_indirect.cp_who_to != ANY) {
-				printf(
-					"verify_grant: indirect grant verify "
-					"failed: bad grantee\n");
-				return EPERM;
-			}
-
-			/* Start over with new granter, grant, and grantee. */
-			grantee = granter;
-			granter = g.cp_u.cp_indirect.cp_who_from;
-			grant = g.cp_u.cp_indirect.cp_grant;
+			/* 
+			 * This feature seems unused. Thus disable it,
+			 * this will make the locking tremendously easier since
+			 * without indirect grants we know in advance which
+			 * procs to lock.
+			 * I said **seems** to be unused, quickly grepping the
+			 * code base the only usage I found are not used by
+			 * my current setup so YMMV.
+			 */
+			panic("NOT IMPLEMENTED");
 		}
 	} while(g.cp_flags & CPF_INDIRECT);
 
@@ -282,13 +269,12 @@ static int safecopy(
 				 */
 )
 {
-	static struct vir_addr v_src, v_dst;
-	static vir_bytes v_offset;
+	struct vir_addr v_src, v_dst;
+	vir_bytes v_offset;
+	struct proc *granter_ptr;
 	endpoint_t new_granter, *src, *dst;
 	int r;
 	struct cp_sfinfo sfinfo;
-
-	assert(proc_locked(caller));
 
 	if(granter == NONE || grantee == NONE) {
 		printf("safecopy: nonsense processes\n");
@@ -304,20 +290,31 @@ static int safecopy(
 		dst = &granter;
 	}
 
+	/* Lock the granter. */
+	granter_ptr = proc_for_endpoint(granter);
+	lock_proc(granter_ptr);
+
 	/* Verify permission exists. */
 	if((r=verify_grant(granter, grantee, grantid, bytes, access,
 	    g_offset, &v_offset, &new_granter, &sfinfo)) != OK) {
+		unlock_proc(granter_ptr);
+		lock_proc(caller); /* Kernel call policy. */
 		if(r == ENOTREADY) return r;
 			printf(
 		"grant %d verify to copy %d->%d by %d failed: err %d\n",
 				grantid, *src, *dst, grantee, r);
 		return r;
 	}
+	unlock_proc(granter_ptr);
 
 	/* verify_grant() can redirect the grantee to someone else,
 	 * meaning the source or destination changes.
 	 */
 	granter = new_granter;
+	/* The granter may have changed, so re-acquire the lock. */
+	granter_ptr = proc_for_endpoint(granter);
+	assert(grantee==caller->p_endpoint);
+	lock_two_procs(caller,granter_ptr);
 
 	/* Now it's a regular copy. */
 	v_src.proc_nr_e = *src;
@@ -355,6 +352,11 @@ static int safecopy(
 			 * sequence number) as a form of protection in the
 			 * light of CPU concurrency.
 			 */
+			struct proc *new_ptr = proc_for_endpoint(sfinfo.endpt);
+			unlock_two_procs(caller,granter_ptr);
+			lock_two_procs(caller,new_ptr);
+			assert(caller!=new_ptr);
+
 			r = data_copy(KERNEL, (vir_bytes)&sfinfo.value,
 			    sfinfo.endpt, sfinfo.addr, sizeof(sfinfo.value));
 			/*
@@ -367,22 +369,48 @@ static int safecopy(
 				    sfinfo.value, sfinfo.endpt, sfinfo.addr,
 				    r);
 
+			unlock_proc(new_ptr);
 			return EFAULT;
 		}
+		unlock_proc(granter_ptr);
 		return r;
 	}
-	return virtual_copy_vmcheck(caller, &v_src, &v_dst, bytes);
+	const int res = virtual_copy_vmcheck(caller, &v_src, &v_dst, bytes);
+	/* Remember kids, the kernel_call mustn't relase the caller's lock. */
+	unlock_proc(granter_ptr);
+	return res;
 }
 
 /*===========================================================================*
  *				do_safecopy_to				     *
  *===========================================================================*/
+static int call_safe_copy(struct proc *caller, message *m_ptr, int access)
+{
+	/* Unpack the params for safecopy. */
+	const endpoint_t granter = m_ptr->m_lsys_kern_safecopy.from_to;
+	const endpoint_t grantee = caller->p_endpoint;
+	const cp_grant_id_t grantid =
+		(cp_grant_id_t) m_ptr->m_lsys_kern_safecopy.gid;
+	const size_t bytes = m_ptr->m_lsys_kern_safecopy.bytes;
+	const vir_bytes g_offset = m_ptr->m_lsys_kern_safecopy.offset;
+	const vir_bytes addr = (vir_bytes) m_ptr->m_lsys_kern_safecopy.address;
+
+	assert(caller->p_endpoint!=granter);
+	/* Safecopies will take the locks for us, including the caller. */
+	const int res = safecopy(caller,
+				 granter,
+				 grantee,
+				 grantid,
+				 bytes,
+				 g_offset,
+				 addr,
+				 access);
+	return res;
+}
+
 int do_safecopy_to(struct proc * caller, message * m_ptr)
 {
-	return safecopy(caller, m_ptr->m_lsys_kern_safecopy.from_to, caller->p_endpoint,
-		(cp_grant_id_t) m_ptr->m_lsys_kern_safecopy.gid,
-		m_ptr->m_lsys_kern_safecopy.bytes, m_ptr->m_lsys_kern_safecopy.offset,
-		(vir_bytes) m_ptr->m_lsys_kern_safecopy.address, CPF_WRITE);
+	return call_safe_copy(caller,m_ptr,CPF_WRITE);
 }
 
 /*===========================================================================*
@@ -390,10 +418,7 @@ int do_safecopy_to(struct proc * caller, message * m_ptr)
  *===========================================================================*/
 int do_safecopy_from(struct proc * caller, message * m_ptr)
 {
-	return safecopy(caller, m_ptr->m_lsys_kern_safecopy.from_to, caller->p_endpoint,
-		(cp_grant_id_t) m_ptr->m_lsys_kern_safecopy.gid,
-		m_ptr->m_lsys_kern_safecopy.bytes, m_ptr->m_lsys_kern_safecopy.offset,
-		(vir_bytes) m_ptr->m_lsys_kern_safecopy.address, CPF_READ);
+	return call_safe_copy(caller,m_ptr,CPF_READ);
 }
 
 /*===========================================================================*
@@ -401,8 +426,8 @@ int do_safecopy_from(struct proc * caller, message * m_ptr)
  *===========================================================================*/
 int do_vsafecopy(struct proc * caller, message * m_ptr)
 {
-	static struct vscp_vec vec[SCPVEC_NR];
-	static struct vir_addr src, dst;
+	struct vscp_vec vec[SCPVEC_NR];
+	struct vir_addr src, dst;
 	int r, i, els;
 	size_t bytes;
 
@@ -417,9 +442,14 @@ int do_vsafecopy(struct proc * caller, message * m_ptr)
 	els = m_ptr->m_lsys_kern_vsafecopy.vec_size;
 	bytes = els * sizeof(struct vscp_vec);
 
+	/* No need to lock KERNEL during the copying. */
+	lock_proc(caller);
+
 	/* Obtain vector of copies. */
 	if((r=virtual_copy_vmcheck(caller, &src, &dst, bytes)) != OK)
 		return r;
+
+	unlock_proc(caller);
 
 	/* Perform safecopies. */
 	for(i = 0; i < els; i++) {
@@ -434,18 +464,20 @@ int do_vsafecopy(struct proc * caller, message * m_ptr)
 		} else {
 			printf("vsafecopy: %d: element %d/%d: no SELF found\n",
 				caller->p_endpoint, i, els);
+			lock_proc(caller);
 			return EINVAL;
 		}
 
-		/* Do safecopy for this element. */
 		if((r=safecopy(caller, granter, caller->p_endpoint,
 			vec[i].v_gid,
 			vec[i].v_bytes, vec[i].v_offset,
 			vec[i].v_addr, access)) != OK) {
 			return r;
 		}
+		unlock_proc(caller);
 	}
 
+	lock_proc(caller);
 	return OK;
 }
 

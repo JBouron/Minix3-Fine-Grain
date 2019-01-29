@@ -193,7 +193,7 @@ void memset_fault_in_kernel(void);
 				virtual_copy_f(NULL, src, dst, bytes, 0)
 #define virtual_copy_vmcheck(caller, src, dst, bytes) \
 				virtual_copy_f(caller, src, dst, bytes, 1)
-int virtual_copy_f(struct proc * caller, struct vir_addr *src, struct
+int virtual_copy_f(struct proc * caller, const struct vir_addr *src, const struct
 	vir_addr *dst, vir_bytes bytes, int vmcheck);
 int data_copy(endpoint_t from, vir_bytes from_addr, endpoint_t to,
 	vir_bytes to_addr, size_t bytes);

@@ -604,14 +604,14 @@ int vm_memset(struct proc* caller, endpoint_t who, phys_bytes ph, int c,
  *===========================================================================*/
 int virtual_copy_f(
   struct proc * caller,
-  struct vir_addr *src_addr,	/* source virtual address */
-  struct vir_addr *dst_addr,	/* destination virtual address */
+  const struct vir_addr *src_addr,	/* source virtual address */
+  const struct vir_addr *dst_addr,	/* destination virtual address */
   vir_bytes bytes,		/* # of bytes to copy  */
   int vmcheck			/* if nonzero, can return VMSUSPEND */
 )
 {
 /* Copy bytes from virtual address src_addr to virtual address dst_addr. */
-  struct vir_addr *vir_addr[2];	/* virtual source and destination address */
+  const struct vir_addr *vir_addr[2];	/* virtual source and destination address */
   int i, r;
   struct proc *procs[2];
 
