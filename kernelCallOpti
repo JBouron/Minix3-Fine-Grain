@@ -3,7 +3,7 @@
 O | KC_KTRACE_SYS_VMCTL        | 388076     | 
 O | KC_KTRACE_SYS_SAFECOPYTO   | 34138      | Fix pdes in data_copy
 O | KC_KTRACE_SYS_SAFECOPYFROM | 21725      | Fix pdes in data_copy
-  | KC_KTRACE_SYS_MEMSET       | 27391      | Fix pdes in data_copy
+O | KC_KTRACE_SYS_MEMSET       | 27391      | Fix pdes in data_copy
 O | KC_KTRACE_SYS_VIRCOPY      | 16211      | Fix pdes in data_copy
 O | KC_KTRACE_SYS_DEVIO        | 61115      | 
 O | KC_KTRACE_SYS_UMAP         | 7191       | Fix pdes in data_copy
@@ -33,7 +33,7 @@ O | KC_KTRACE_SYS_EXIT         | 2          |
   | KC_KTRACE_SYS_SIGSEND      | 1          | data_copy
   | KC_KTRACE_SYS_SIGRETURN    | 1          | Fix pdes in data_copy
 O | KC_KTRACE_SYS_STIME        | 1          | 
-  | KC_KTRACE_SYS_SAFEMEMSET   | 0          | data_copy
+O | KC_KTRACE_SYS_SAFEMEMSET   | 0          | data_copy
 O | KC_KTRACE_SYS_IOPENABLE    | 0          | 
   | KC_KTRACE_SYS_UPDATE       | 0          | Fix pdes in data_copy
 O | KC_KTRACE_SYS_ABORT        | 0          | 

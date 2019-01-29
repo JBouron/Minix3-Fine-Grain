@@ -397,12 +397,20 @@ int vm_check_range(struct proc *caller, struct proc *target,
 int vm_memset(struct proc* caller, endpoint_t who, phys_bytes ph, int c,
 	phys_bytes count)
 {
+	/* vm_memset is only called by do_memset and do_safememset. In both
+	 * cases it is called in tail position. Thus, impose the following:
+	 * 	_ vm_memset assumes that caller is locked.
+	 * 	_ vm_memset assures that caller is locked after returning.
+	 */
+
 	u32_t pattern;
 	struct proc *whoptr = NULL;
 	phys_bytes cur_ph = ph;
 	phys_bytes left = count;
 	phys_bytes ptr, chunk, pfa = 0;
 	int new_cr3, r = OK;
+
+	assert(proc_locked(caller));
 
 	if ((r = check_resumed_caller(caller)) != OK)
 		return r;
@@ -421,6 +429,8 @@ int vm_memset(struct proc* caller, endpoint_t who, phys_bytes ph, int c,
 	/* We can memset as many bytes as we have remaining,
 	 * or as many as remain in the 4MB chunk we mapped in.
 	 */
+	unlock_proc(caller);
+	lock_proc(whoptr);
 	while (left > 0) {
 		new_cr3 = 0;
 		chunk = left;
@@ -434,10 +444,14 @@ int vm_memset(struct proc* caller, endpoint_t who, phys_bytes ph, int c,
 
 			/* If a process pagefaults, VM may help out */
 			if (whoptr) {
+				unlock_proc(whoptr);
+				lock_two_procs(caller,whoptr);
 				vm_suspend(caller, whoptr, ph, count,
 						   VMSTYPE_KERNELCALL, 1);
 				assert(get_cpulocal_var(catch_pagefaults));
 				get_cpulocal_var(catch_pagefaults) = 0;
+				if(whoptr!=caller)
+					unlock_proc(whoptr);
 				return VMSUSPEND;
 			}
 
@@ -449,10 +463,13 @@ int vm_memset(struct proc* caller, endpoint_t who, phys_bytes ph, int c,
 		cur_ph += chunk;
 		left -= chunk;
 	}
+	unlock_proc(whoptr);
 
 	assert(get_cpulocal_var(ptproc)->p_seg.p_cr3_v);
 	assert(get_cpulocal_var(catch_pagefaults));
 	get_cpulocal_var(catch_pagefaults) = 0;
+
+	lock_proc(caller);
 
 	return OK;
 }

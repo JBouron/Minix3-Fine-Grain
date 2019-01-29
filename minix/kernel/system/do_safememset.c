@@ -34,21 +34,35 @@ int do_safememset(struct proc *caller, message *m_ptr) {
 	static vir_bytes v_offset;
 	int r;
 
-	if (dst_endpt == NONE || caller_endpt == NONE)
+	if (dst_endpt == NONE || caller_endpt == NONE) {
+		lock_proc(caller);
 		return EFAULT;
+	}
 
-	if (!(dst_p = endpoint_lookup(dst_endpt)))
+	if (!(dst_p = endpoint_lookup(dst_endpt))) {
+		lock_proc(caller);
 		return EINVAL;
+	}
+
+	lock_two_procs(caller,dst_p);
 
 	if (!(priv(dst_p) && priv(dst_p)->s_grant_table)) {
 		printf("safememset: dst %d has no grant table\n", dst_endpt);
+		if(dst_p!=caller)
+			unlock_proc(dst_p);
 		return EINVAL;
 	}
 
 	/* Verify permission exists, memset always requires CPF_WRITE */
 	r = verify_grant(caller,dst_endpt, caller_endpt, grantid, len, CPF_WRITE,
 			 g_offset, &v_offset, &new_granter, NULL);
-	if(r==VMSUSPEND) return r;
+
+	if(dst_p!=caller)
+		unlock_proc(dst_p);
+
+	if(r==VMSUSPEND) {
+		return r;
+	}
 
 	if (r != OK) {
 		printf("safememset: grant %d verify failed %d", grantid, r);
