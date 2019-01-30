@@ -328,6 +328,7 @@ void switch_to_user(void)
 	struct proc * p;
 #ifdef CONFIG_SMP
 	int tlb_must_refresh = 0;
+	const int cpu = cpuid;
 #endif
 
 	/* Send all the signals from the kernel operation we just performed. */
@@ -392,22 +393,22 @@ not_runnable_pick_new:
 	 * process. If there is still nothing runnable we "schedule" IDLE again
 	 */
 retry_pick:
-	lock_runqueues(cpuid);
+	lock_runqueues(cpu);
 	while (!(p = pick_proc())) {
 		/* Set the idle state while holding the queue lock to avoid
 		 * race conditions. */
 		get_cpulocal_var(cpu_is_idle) = 1;
-		unlock_runqueues(cpuid);
+		unlock_runqueues(cpu);
 		idle();
 		/* We might have scheduled some signal when waking up from the
 		 * halt. handle them now. */
 		handle_all_deferred_sigs();
-		lock_runqueues(cpuid);
+		lock_runqueues(cpu);
 	}
-	unlock_runqueues(cpuid);
+	unlock_runqueues(cpu);
 
 	lock_proc(p);
-	if(p->p_cpu!=cpuid) {
+	if(p->p_cpu!=cpu) {
 		/* We have a small race-condition here. During the small gap
 		 * between the proc selection and the lock on p, p might have
 		 * been migrated. In this case, simply do nothing on p, it is
@@ -484,7 +485,7 @@ check_misc_flags:
 
 	TRACE(VF_SCHEDULING, printf("cpu %d starting %s / %d "
 				"pc 0x%08x\n",
-		cpuid, p->p_name, p->p_endpoint, p->p_reg.pc););
+		cpu, p->p_name, p->p_endpoint, p->p_reg.pc););
 #if DEBUG_TRACE
 	p->p_schedules++;
 #endif
@@ -2031,11 +2032,12 @@ void enqueue(
  */
   int q = rp->p_priority;	 		/* scheduling queue to use */
   int wake_remote_cpu = 0;
+  const int cpu = cpuid;
   struct proc **rdy_head, **rdy_tail;
   
   assert(proc_is_runnable(rp));
 
-  if(cpuid!=rp->p_cpu)
+  if(cpu!=rp->p_cpu)
 	  n_remote_enq++;
 
   assert(q >= 0);
@@ -2059,12 +2061,12 @@ void enqueue(
   /* Check now if we will need to send an IPI to wake the remote cpu.
    * We need to do this while holding the queue lock of the other cpu to
    * avoid race conditions. */
-  wake_remote_cpu = (rp->p_cpu!=cpuid)&&get_cpu_var(rp->p_cpu,cpu_is_idle);
+  wake_remote_cpu = (rp->p_cpu!=cpu)&&get_cpu_var(rp->p_cpu,cpu_is_idle);
   unlock_runqueues(rp->p_cpu);
 
   rp->p_enqueued = 1;
 
-  if (cpuid == rp->p_cpu) {
+  if (cpu == rp->p_cpu) {
 	  /*
 	   * enqueueing a process with a higher priority than the current one,
 	   * it gets preempted. The current process must be preemptible. Testing
@@ -2477,9 +2479,6 @@ void _rts_set(struct proc *p,int flag,int lockflag)
 	else if(lockflag==2)
 		assert(proc_locked(p));
 	p->p_rts_flags |= (flag);
-	p->__gdb_last_cpu_flag = cpuid;
-	p->__gdb_line = __LINE__;
-	p->__gdb_file = __FILE__;
 	if(!proc_is_runnable(p)&&p->p_enqueued) {
 		if(cpuid!=p->p_cpu)
 			smp_dequeue_task(p);
@@ -2498,9 +2497,6 @@ void _rts_unset(struct proc *p,int flag,int lockflag)
 		assert(proc_locked(p));
 	rts = p->p_rts_flags;
 	p->p_rts_flags &= ~(flag);
-	p->__gdb_last_cpu_flag = cpuid;
-	p->__gdb_line = __LINE__;
-	p->__gdb_file = __FILE__;
 	if(!rts_f_is_runnable(rts) && proc_is_runnable(p)) {
 		enqueue(p);
 	}
@@ -2525,7 +2521,6 @@ void lock_proc(struct proc *p)
 		return;
 	/* For now we bypass the reentrant locks. */
 	spinlock_lock(&(p->p_lock.lock));
-	p->p_lock.owner = cpuid;
 }
 
 void unlock_proc(struct proc *p)
@@ -2534,33 +2529,17 @@ void unlock_proc(struct proc *p)
 	if(!p)
 		return;
 	/* For now we bypass the reentrant locks. */
-	assert(p->p_lock.owner==cpuid);
-	p->p_lock.owner = -1;
 	spinlock_unlock(&(p->p_lock.lock));
 }
 
 int proc_locked(const struct proc *p)
 {
-	/* Assert if a proc is locked by the current cpu.
-	 * We don't need to lock pseudo processes. */
-	if(!p)
-		return 1;
-	else if(p->p_endpoint==KERNEL||p->p_endpoint==SYSTEM)
-		return 1;
-	else
-		return (p->p_lock.lock.val==1&&p->p_lock.owner==cpuid);
+	return 1;
 }
 
 int proc_locked_borrow(const struct proc *p)
 {
-	/* Assert if a proc is locked by a remote cpu.
-	 * We don't need to lock pseudo processes. */
-	if(!p)
-		return 1;
-	else if(p->p_endpoint==KERNEL||p->p_endpoint==SYSTEM)
-		return 1;
-	else
-		return (p->p_lock.lock.val==1&&p->p_lock.owner!=cpuid);
+	return 1;
 }
 
 void lock_two_procs(struct proc *p1,struct proc *p2)
