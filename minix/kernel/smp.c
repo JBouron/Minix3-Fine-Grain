@@ -68,7 +68,12 @@ void smp_ipi_halt_handler(void)
 
 void smp_schedule(unsigned cpu)
 {
-	arch_send_smp_schedule_ipi(cpu,0);
+	/* Do not ever send an NMI here. The goal of this IPI is to either
+	 * wake up the cpu or preempt its current proc.
+	 * Using a NMI would prevent us from preempting the current proc as the
+	 * remote cpu would bypass context_stop and switch_to_user. */
+	const int nmi = 0;
+	arch_send_smp_schedule_ipi(cpu,nmi);
 }
 
 void smp_sched_handler(void);
@@ -263,17 +268,25 @@ void smp_ipi_sched_handler(void)
 
 	ipi_ack();
 
-	/* We used to preempt the curr here, no matter what. However a race
-	 * condition can (and will arise) if the remote core is picking the
-	 * next task to run at the same time. In this case the IPI will mark
-	 * this task as RTS_PREEMPTED and the assert(proc_is_runnable(p)) in
-	 * switch_to_user will fail.
+	/* We end up here because a cpu sent us a sched IPI.
+	 * There are two scenarios:
+	 * 	_ We were running in user-space.
+	 * 	_ We were halting in idle().
+	 * In both of those scenario we don't hold any lock. Thus we can safely
+	 * take the lock on curr.
+	 * Now, the remote cpu can send us this IPI for two reasons:
+	 * 	_ It enqueued a task in our runqueue while we were idle. Thus
+	 *  this is a wake up call.
+	 * 	_ It enqueued a task of higher priority than the one we were
+	 *  running until now.
+	 * The way to distinguish between the two is to look at the proc_ptr.
+	 * If it is not the idle task then it means that we need to preempt it.
 	 */
-#if 0
 	curr = get_cpulocal_var(proc_ptr);
+	lock_proc(curr);
 	if (curr->p_endpoint != IDLE) {
 		RTS_SET(curr, RTS_PREEMPTED);
 	}
-#endif
+	unlock_proc(curr);
 }
 
