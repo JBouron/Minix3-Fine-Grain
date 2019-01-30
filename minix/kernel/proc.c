@@ -2105,6 +2105,16 @@ void enqueue(
    */
   else if (wake_remote_cpu) {
 	  smp_schedule(rp->p_cpu);
+  } else {
+	  /* In this case, the proc has been enqueued on another cpu, and this
+	   * cpu is not idle. Check if we need to tell it to preempt its
+	   * current proc. */
+
+	  struct proc * const p = get_cpulocal_var(proc_ptr);
+	  /* We are a bit reckless here, but that's fine. */
+	  if((p->p_priority>rp->p_priority)&&(priv(p)->s_flags&PREEMPTIBLE)) {
+		  smp_schedule(rp->p_cpu);
+	  }
   }
 #endif
 
@@ -2396,10 +2406,6 @@ void proc_no_time(struct proc * p)
 		 * be renewed. In fact, they by pass scheduling
 		 */
 		p->p_cpu_time_left = ms_2_cpu_time(p->p_quantum_size_ms);
-#if DEBUG_RACE
-		RTS_SET(p, RTS_PREEMPTED);
-		RTS_UNSET(p, RTS_PREEMPTED);
-#endif
 	}
 }
 
