@@ -134,6 +134,7 @@ static int is_kernel_call_optimized(int call_nr)
 		SYS_EXEC,
 		SYS_GETINFO,
 		SYS_DIAGCTL,
+		SYS_READBIOS,
 		/* Add optimized calls to the list ... */
 	};
 	for(i=0;
