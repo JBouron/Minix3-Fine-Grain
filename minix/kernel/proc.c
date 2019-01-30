@@ -334,13 +334,13 @@ void switch_to_user(void)
 	/* Send all the signals from the kernel operation we just performed. */
 	handle_all_deferred_sigs();
 
-	p = get_cpulocal_var(proc_ptr);
+	p = get_cpu_var(cpu,proc_ptr);
 	lock_proc(p);
 
 	/* Handle the preemption here. We need to do this before the next if
 	 * (proc_is_runnable) because most of the time the preempted proc is
 	 * runnable. */
-	if(get_cpulocal_var(preempt_curr)) {
+	if(get_cpu_var(cpu,preempt_curr)) {
 		/* Set the RTS_PREEMPTED here. If the proc is also migrating
 		 * then don't bother. */
 		if(!proc_is_migrating(p)) {
@@ -365,7 +365,7 @@ not_runnable_pick_new:
          * enqueue below, because the proc_ptr is set to `p` at this point.
 	 * This explanation sucks, all I know is the deferred sigs must be
 	 * sent *before* the potential enqueue, but I don't remember why :/ */
-	if(get_cpulocal_var(sigbuffer_count)>0) {
+	if(get_cpu_var(cpu,sigbuffer_count)>0) {
 		unlock_proc(p);
 		handle_all_deferred_sigs();
 		lock_proc(p);
@@ -394,7 +394,7 @@ not_runnable_pick_new:
 	 * NMI request after exiting the while loop below, but before changing
 	 * proc_ptr, the cpu will not mistakenly use the "old" value of
 	 * proc_ptr in smp_sched_handler. */
-	get_cpulocal_var(proc_ptr) = get_cpulocal_var_ptr(idle_proc);
+	get_cpu_var(cpu,proc_ptr) = get_cpulocal_var_ptr(idle_proc);
 	unlock_proc(p);
 
 	/*
@@ -408,7 +408,7 @@ retry_pick:
 	while (!(p = pick_proc())) {
 		/* Set the idle state while holding the queue lock to avoid
 		 * race conditions. */
-		get_cpulocal_var(cpu_is_idle) = 1;
+		get_cpu_var(cpu,cpu_is_idle) = 1;
 		unlock_runqueues(cpu);
 		idle();
 		/* We might have scheduled some signal when waking up from the
@@ -432,10 +432,10 @@ retry_pick:
 	}
 
 	/* update the global variable */
-	get_cpulocal_var(proc_ptr) = p;
+	get_cpu_var(cpu,proc_ptr) = p;
 
 #ifdef CONFIG_SMP
-	if (p->p_misc_flags & MF_FLUSH_TLB && get_cpulocal_var(ptproc) == p)
+	if (p->p_misc_flags & MF_FLUSH_TLB && get_cpu_var(cpu,ptproc) == p)
 		tlb_must_refresh = 1;
 #endif
 	switch_address_space(p);
@@ -482,7 +482,7 @@ check_misc_flags:
 	if (!p->p_cpu_time_left)
 		proc_no_time(p);
 
-	if(get_cpulocal_var(sigbuffer_count)>0) {
+	if(get_cpu_var(cpu,sigbuffer_count)>0) {
 		unlock_proc(p);
 		handle_all_deferred_sigs();
 		lock_proc(p);
@@ -507,7 +507,7 @@ check_misc_flags:
 	context_stop(proc_addr(KERNEL));
 
 	/* If the process isn't the owner of FPU, enable the FPU exception */
-	if (get_cpulocal_var(fpu_owner) != p)
+	if (get_cpu_var(cpu,fpu_owner) != p)
 		enable_fpu_exception();
 	else
 		disable_fpu_exception();
@@ -536,7 +536,7 @@ check_misc_flags:
 	ktzprofile_event(KTRACE_USER_START);
 
 	/* Check that we did not forget to send a signal. */
-	assert(get_cpulocal_var(sigbuffer_count)==0);
+	assert(get_cpu_var(cpu,sigbuffer_count)==0);
 	
 	/*
 	 * restore_user_context() carries out the actual mode switch from kernel
@@ -2083,7 +2083,7 @@ void enqueue(
 	   * it gets preempted. The current process must be preemptible. Testing
 	   * the priority also makes sure that a process does not preempt itself
 	   */
-	  struct proc * const p = get_cpulocal_var(proc_ptr);
+	  struct proc * const p = get_cpu_var(cpu,proc_ptr);
 	  assert(p);
 	  if((p->p_priority>rp->p_priority)&&(priv(p)->s_flags&PREEMPTIBLE)) {
 		  /* Ok, I know, we don't have a lock on p here ... but really,
@@ -2096,7 +2096,7 @@ void enqueue(
 		   * next switch_to_user we can be sure that the proc_ptr will
 		   * be locked by us.
 		   */
-		  get_cpulocal_var(preempt_curr) = 1;
+		  get_cpu_var(cpu,preempt_curr) = 1;
 	  }
   }
 #ifdef CONFIG_SMP
@@ -2121,7 +2121,7 @@ void enqueue(
 #endif
 
   /* Make note of when this process was added to queue */
-  read_tsc_64(&(get_cpulocal_var(proc_ptr)->p_accounting.enter_queue));
+  read_tsc_64(&(get_cpu_var(cpu,proc_ptr)->p_accounting.enter_queue));
 
 
 #if DEBUG_SANITYCHECKS
