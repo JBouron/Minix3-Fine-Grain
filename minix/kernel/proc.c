@@ -336,6 +336,17 @@ void switch_to_user(void)
 	p = get_cpulocal_var(proc_ptr);
 	lock_proc(p);
 
+	/* Handle the preemption here. We need to do this before the next if
+	 * (proc_is_runnable) because most of the time the preempted proc is
+	 * runnable. */
+	if(get_cpulocal_var(preempt_curr)) {
+		/* Set the RTS_PREEMPTED here. If the proc is also migrating
+		 * then don't bother. */
+		if(!proc_is_migrating(p)) {
+			RTS_SET(p,RTS_PREEMPTED);
+		}
+	}
+
 	/*
 	 * if the current process is still runnable check the misc flags and let
 	 * it run unless it becomes not runnable in the meantime
@@ -2070,21 +2081,21 @@ void enqueue(
 	   * it gets preempted. The current process must be preemptible. Testing
 	   * the priority also makes sure that a process does not preempt itself
 	   */
-#if 0
-	  /* TODO: Preemption is disabled until we find a way to do it without
-	   * race condition (and also remotely).
-	   *
-	   * ##################################################################
-	   * ##################################################################
-	   */
-
-	  struct proc * p;
-	  p = get_cpulocal_var(proc_ptr);
+	  struct proc * const p = get_cpulocal_var(proc_ptr);
 	  assert(p);
-	  if((p->p_priority > rp->p_priority) &&
-			  (priv(p)->s_flags & PREEMPTIBLE))
-		  RTS_SET_UNSAFE(p, RTS_PREEMPTED); /* calls dequeue() */
-#endif
+	  if((p->p_priority>rp->p_priority)&&(priv(p)->s_flags&PREEMPTIBLE)) {
+		  /* Ok, I know, we don't have a lock on p here ... but really,
+		   * it doesn't matter that much. Live fast die young.
+		   * But yeah, this cpu needs to remember to preempt the
+		   * proc_ptr at the next switch_to_user.
+		   * Why not do it know you ask ? Well because we don't have a
+		   * lock on proc_ptr. Thus we would risk a race-condition (
+		   * which actually happens in practice). By waiting until the
+		   * next switch_to_user we can be sure that the proc_ptr will
+		   * be locked by us.
+		   */
+		  get_cpulocal_var(preempt_curr) = 1;
+	  }
   }
 #ifdef CONFIG_SMP
   /*

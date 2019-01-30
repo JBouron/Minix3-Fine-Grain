@@ -66,6 +66,9 @@ extern struct __cpu_local_vars {
 	int n_retries_recv;
 	int n_retries_recv_all_null;
 
+	int preempt_curr;		/* Should we preempt proc_ptr at the next
+					   switch_to_user ? */
+
 	int catch_pagefaults;
 
 	/* All the signals that this cpu should send before exiting the kernel
