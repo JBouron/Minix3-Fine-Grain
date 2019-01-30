@@ -2112,7 +2112,7 @@ void enqueue(
 	   * cpu is not idle. Check if we need to tell it to preempt its
 	   * current proc. */
 
-	  struct proc * const p = get_cpulocal_var(proc_ptr);
+	  struct proc * const p = get_cpu_var(rp->p_cpu,proc_ptr);
 	  /* We are a bit reckless here, but that's fine. */
 	  if((p->p_priority>rp->p_priority)&&(priv(p)->s_flags&PREEMPTIBLE)) {
 		  smp_schedule(rp->p_cpu);
