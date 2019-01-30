@@ -108,9 +108,12 @@ int isokendpt_f(const char *file, int line, endpoint_t endpoint, int *proc,
 	if(ke == NONE) {
 		assert(fproc[*proc].fp_pid == PID_FREE);
 	} else {
-		printf("VFS %s:%d: proc (%d) from endpoint (%d) doesn't match "
-			"known endpoint (%d)\n", file, line, *proc, endpoint,
-			fproc[*proc].fp_endpoint);
+		//TODO: The proc might have been killed and messages arrived
+		// out of order. This problem occurs very rarely, and when it
+		// does the boot doesn't fail, thus ignore this.
+		//printf("VFS %s:%d: proc (%d) from endpoint (%d) doesn't match "
+			//"known endpoint (%d)\n", file, line, *proc, endpoint,
+			//fproc[*proc].fp_endpoint);
 		assert(fproc[*proc].fp_pid != PID_FREE);
 	}
 	failed = 1;
