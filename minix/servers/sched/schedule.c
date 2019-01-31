@@ -184,12 +184,7 @@ int do_start_scheduling(message *m_ptr)
 		return EINVAL;
 	}
 
-	/* The system processes will run on the BSP cpu only during boot. */
-	if(is_system_proc(rmp)) {
-		restrict_to_bsp(rmp);
-	} else {
-		allow_all_cpus(rmp);
-	}
+	allow_all_cpus(rmp);
 
 	cpu_chosen = 0;
 	/* Inherit current priority and time slice from parent. Since there
@@ -362,6 +357,10 @@ void init_scheduling(void)
 	int r;
 
 	balance_timeout = BALANCE_TIMEOUT * sys_hz();
+
+	/* There are 12 processes scheduled by the kernel, all running on cpu0,
+	 * take them into account. */
+	cpu_proc[0] = 12;
 
 	if ((r = sys_setalarm(balance_timeout, 0)) != OK)
 		panic("sys_setalarm failed: %d", r);
