@@ -227,60 +227,39 @@ struct proc {
 #define RTS_SET(rp, f) \
 	do { \
 		_rts_set(rp,f,2); \
-		rp->__gdb_last_cpu_flag = cpuid; \
-		rp->__gdb_line = __LINE__; \
-		rp->__gdb_file = __FILE__; \
 	}while(0)
 
 /* Clear flag and enqueue if the process was not runnable but is now. */
 #define RTS_UNSET(rp, f) \
 	do { \
 		_rts_unset(rp,f,2); \
-		rp->__gdb_last_cpu_flag = cpuid; \
-		rp->__gdb_line = __LINE__; \
-		rp->__gdb_file = __FILE__; \
 	}while(0)
 
 #define RTS_SET_BORROW(rp, f) \
 	do { \
 		_rts_set(rp,f,1); \
-		rp->__gdb_last_cpu_flag = cpuid; \
-		rp->__gdb_line = __LINE__; \
-		rp->__gdb_file = __FILE__; \
 	}while(0)
 
 /* Clear flag and enqueue if the process was not runnable but is now. */
 #define RTS_UNSET_BORROW(rp, f) \
 	do { \
 		_rts_unset(rp,f,1); \
-		rp->__gdb_last_cpu_flag = cpuid; \
-		rp->__gdb_line = __LINE__; \
-		rp->__gdb_file = __FILE__; \
 	}while(0)
 
 #define RTS_SET_UNSAFE(rp, f) \
 	do { \
 		_rts_set(rp,f,0); \
-		rp->__gdb_last_cpu_flag = cpuid; \
-		rp->__gdb_line = __LINE__; \
-		rp->__gdb_file = __FILE__; \
 	}while(0)
 
 #define RTS_UNSET_UNSAFE(rp, f) \
 	do { \
 		_rts_unset(rp,f,0); \
-		rp->__gdb_last_cpu_flag = cpuid; \
-		rp->__gdb_line = __LINE__; \
-		rp->__gdb_file = __FILE__; \
 	}while(0)
 
 /* Set flags to this value. */
 #define RTS_SETFLAGS(rp, f) \
 	do { \
 		_rts_setflags(rp,f); \
-		rp->__gdb_last_cpu_flag = cpuid; \
-		rp->__gdb_line = __LINE__; \
-		rp->__gdb_file = __FILE__; \
 	}while(0)
 
 /* Misc flags */

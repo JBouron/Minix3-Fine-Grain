@@ -328,18 +328,19 @@ void switch_to_user(void)
 	struct proc * p;
 #ifdef CONFIG_SMP
 	int tlb_must_refresh = 0;
+	const int cpu = cpuid;
 #endif
 
 	/* Send all the signals from the kernel operation we just performed. */
 	handle_all_deferred_sigs();
 
-	p = get_cpulocal_var(proc_ptr);
+	p = get_cpu_var(cpu,proc_ptr);
 	lock_proc(p);
 
 	/* Handle the preemption here. We need to do this before the next if
 	 * (proc_is_runnable) because most of the time the preempted proc is
 	 * runnable. */
-	if(get_cpulocal_var(preempt_curr)) {
+	if(get_cpu_var(cpu,preempt_curr)) {
 		/* Set the RTS_PREEMPTED here. If the proc is also migrating
 		 * then don't bother. */
 		if(!proc_is_migrating(p)) {
@@ -364,7 +365,7 @@ not_runnable_pick_new:
          * enqueue below, because the proc_ptr is set to `p` at this point.
 	 * This explanation sucks, all I know is the deferred sigs must be
 	 * sent *before* the potential enqueue, but I don't remember why :/ */
-	if(get_cpulocal_var(sigbuffer_count)>0) {
+	if(get_cpu_var(cpu,sigbuffer_count)>0) {
 		unlock_proc(p);
 		handle_all_deferred_sigs();
 		lock_proc(p);
@@ -393,7 +394,7 @@ not_runnable_pick_new:
 	 * NMI request after exiting the while loop below, but before changing
 	 * proc_ptr, the cpu will not mistakenly use the "old" value of
 	 * proc_ptr in smp_sched_handler. */
-	get_cpulocal_var(proc_ptr) = get_cpulocal_var_ptr(idle_proc);
+	get_cpu_var(cpu,proc_ptr) = get_cpulocal_var_ptr(idle_proc);
 	unlock_proc(p);
 
 	/*
@@ -403,22 +404,22 @@ not_runnable_pick_new:
 	 * process. If there is still nothing runnable we "schedule" IDLE again
 	 */
 retry_pick:
-	lock_runqueues(cpuid);
+	lock_runqueues(cpu);
 	while (!(p = pick_proc())) {
 		/* Set the idle state while holding the queue lock to avoid
 		 * race conditions. */
-		get_cpulocal_var(cpu_is_idle) = 1;
-		unlock_runqueues(cpuid);
+		get_cpu_var(cpu,cpu_is_idle) = 1;
+		unlock_runqueues(cpu);
 		idle();
 		/* We might have scheduled some signal when waking up from the
 		 * halt. handle them now. */
 		handle_all_deferred_sigs();
-		lock_runqueues(cpuid);
+		lock_runqueues(cpu);
 	}
-	unlock_runqueues(cpuid);
+	unlock_runqueues(cpu);
 
 	lock_proc(p);
-	if(p->p_cpu!=cpuid) {
+	if(p->p_cpu!=cpu) {
 		/* We have a small race-condition here. During the small gap
 		 * between the proc selection and the lock on p, p might have
 		 * been migrated. In this case, simply do nothing on p, it is
@@ -431,10 +432,10 @@ retry_pick:
 	}
 
 	/* update the global variable */
-	get_cpulocal_var(proc_ptr) = p;
+	get_cpu_var(cpu,proc_ptr) = p;
 
 #ifdef CONFIG_SMP
-	if (p->p_misc_flags & MF_FLUSH_TLB && get_cpulocal_var(ptproc) == p)
+	if (p->p_misc_flags & MF_FLUSH_TLB && get_cpu_var(cpu,ptproc) == p)
 		tlb_must_refresh = 1;
 #endif
 	switch_address_space(p);
@@ -481,7 +482,7 @@ check_misc_flags:
 	if (!p->p_cpu_time_left)
 		proc_no_time(p);
 
-	if(get_cpulocal_var(sigbuffer_count)>0) {
+	if(get_cpu_var(cpu,sigbuffer_count)>0) {
 		unlock_proc(p);
 		handle_all_deferred_sigs();
 		lock_proc(p);
@@ -495,7 +496,7 @@ check_misc_flags:
 
 	TRACE(VF_SCHEDULING, printf("cpu %d starting %s / %d "
 				"pc 0x%08x\n",
-		cpuid, p->p_name, p->p_endpoint, p->p_reg.pc););
+		cpu, p->p_name, p->p_endpoint, p->p_reg.pc););
 #if DEBUG_TRACE
 	p->p_schedules++;
 #endif
@@ -506,7 +507,7 @@ check_misc_flags:
 	context_stop(proc_addr(KERNEL));
 
 	/* If the process isn't the owner of FPU, enable the FPU exception */
-	if (get_cpulocal_var(fpu_owner) != p)
+	if (get_cpu_var(cpu,fpu_owner) != p)
 		enable_fpu_exception();
 	else
 		disable_fpu_exception();
@@ -535,7 +536,7 @@ check_misc_flags:
 	ktzprofile_event(KTRACE_USER_START);
 
 	/* Check that we did not forget to send a signal. */
-	assert(get_cpulocal_var(sigbuffer_count)==0);
+	assert(get_cpu_var(cpu,sigbuffer_count)==0);
 	
 	/*
 	 * restore_user_context() carries out the actual mode switch from kernel
@@ -2042,11 +2043,12 @@ void enqueue(
  */
   int q = rp->p_priority;	 		/* scheduling queue to use */
   int wake_remote_cpu = 0;
+  const int cpu = cpuid;
   struct proc **rdy_head, **rdy_tail;
   
   assert(proc_is_runnable(rp));
 
-  if(cpuid!=rp->p_cpu)
+  if(cpu!=rp->p_cpu)
 	  n_remote_enq++;
 
   assert(q >= 0);
@@ -2070,18 +2072,18 @@ void enqueue(
   /* Check now if we will need to send an IPI to wake the remote cpu.
    * We need to do this while holding the queue lock of the other cpu to
    * avoid race conditions. */
-  wake_remote_cpu = (rp->p_cpu!=cpuid)&&get_cpu_var(rp->p_cpu,cpu_is_idle);
+  wake_remote_cpu = (rp->p_cpu!=cpu)&&get_cpu_var(rp->p_cpu,cpu_is_idle);
   unlock_runqueues(rp->p_cpu);
 
   rp->p_enqueued = 1;
 
-  if (cpuid == rp->p_cpu) {
+  if (cpu == rp->p_cpu) {
 	  /*
 	   * enqueueing a process with a higher priority than the current one,
 	   * it gets preempted. The current process must be preemptible. Testing
 	   * the priority also makes sure that a process does not preempt itself
 	   */
-	  struct proc * const p = get_cpulocal_var(proc_ptr);
+	  struct proc * const p = get_cpu_var(cpu,proc_ptr);
 	  assert(p);
 	  if((p->p_priority>rp->p_priority)&&(priv(p)->s_flags&PREEMPTIBLE)) {
 		  /* Ok, I know, we don't have a lock on p here ... but really,
@@ -2094,7 +2096,7 @@ void enqueue(
 		   * next switch_to_user we can be sure that the proc_ptr will
 		   * be locked by us.
 		   */
-		  get_cpulocal_var(preempt_curr) = 1;
+		  get_cpu_var(cpu,preempt_curr) = 1;
 	  }
   }
 #ifdef CONFIG_SMP
@@ -2119,7 +2121,7 @@ void enqueue(
 #endif
 
   /* Make note of when this process was added to queue */
-  read_tsc_64(&(get_cpulocal_var(proc_ptr)->p_accounting.enter_queue));
+  read_tsc_64(&(get_cpu_var(cpu,proc_ptr)->p_accounting.enter_queue));
 
 
 #if DEBUG_SANITYCHECKS
@@ -2494,9 +2496,6 @@ void _rts_set(struct proc *p,int flag,int lockflag)
 	else if(lockflag==2)
 		assert(proc_locked(p));
 	p->p_rts_flags |= (flag);
-	p->__gdb_last_cpu_flag = cpuid;
-	p->__gdb_line = __LINE__;
-	p->__gdb_file = __FILE__;
 	if(!proc_is_runnable(p)&&p->p_enqueued) {
 		if(cpuid!=p->p_cpu)
 			smp_dequeue_task(p);
@@ -2515,9 +2514,6 @@ void _rts_unset(struct proc *p,int flag,int lockflag)
 		assert(proc_locked(p));
 	rts = p->p_rts_flags;
 	p->p_rts_flags &= ~(flag);
-	p->__gdb_last_cpu_flag = cpuid;
-	p->__gdb_line = __LINE__;
-	p->__gdb_file = __FILE__;
 	if(!rts_f_is_runnable(rts) && proc_is_runnable(p)) {
 		enqueue(p);
 	}
@@ -2542,7 +2538,6 @@ void lock_proc(struct proc *p)
 		return;
 	/* For now we bypass the reentrant locks. */
 	spinlock_lock(&(p->p_lock.lock));
-	p->p_lock.owner = cpuid;
 }
 
 void unlock_proc(struct proc *p)
@@ -2551,33 +2546,17 @@ void unlock_proc(struct proc *p)
 	if(!p)
 		return;
 	/* For now we bypass the reentrant locks. */
-	assert(p->p_lock.owner==cpuid);
-	p->p_lock.owner = -1;
 	spinlock_unlock(&(p->p_lock.lock));
 }
 
 int proc_locked(const struct proc *p)
 {
-	/* Assert if a proc is locked by the current cpu.
-	 * We don't need to lock pseudo processes. */
-	if(!p)
-		return 1;
-	else if(p->p_endpoint==KERNEL||p->p_endpoint==SYSTEM)
-		return 1;
-	else
-		return (p->p_lock.lock.val==1&&p->p_lock.owner==cpuid);
+	return 1;
 }
 
 int proc_locked_borrow(const struct proc *p)
 {
-	/* Assert if a proc is locked by a remote cpu.
-	 * We don't need to lock pseudo processes. */
-	if(!p)
-		return 1;
-	else if(p->p_endpoint==KERNEL||p->p_endpoint==SYSTEM)
-		return 1;
-	else
-		return (p->p_lock.lock.val==1&&p->p_lock.owner!=cpuid);
+	return 1;
 }
 
 void lock_two_procs(struct proc *p1,struct proc *p2)
