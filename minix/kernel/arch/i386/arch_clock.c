@@ -214,6 +214,8 @@ void context_stop(struct proc * p)
 
 	cpu = cpuid;
 
+	lock_proc(p);
+
 	/*
 	 * This function is called only if we switch from kernel to user or idle
 	 * or back. Therefore this is a perfect location to place the big kernel
@@ -230,10 +232,24 @@ void context_stop(struct proc * p)
 		kernel_ticks[cpu] = kernel_ticks[cpu] + tmp;
 		p->p_cycles = p->p_cycles + tmp;
 	} else {
+		u64_t bkl_tsc;
+		atomic_t succ;
+		
+		/* We are entering the kernel thus make sure to grab the BKL
+		 * at the end. */
+		read_tsc_64(&bkl_tsc);
+		/* this only gives a good estimate */
+		succ = big_kernel_lock.val;
+
 		/* We are leaving user space now. */
 		ktzprofile_event(KTRACE_USER_STOP);
 		
 		read_tsc_64(&tsc);
+
+		bkl_ticks[cpu] = bkl_ticks[cpu] + tsc - bkl_tsc;
+		bkl_tries[cpu]++;
+		bkl_succ[cpu] += !(!(succ == 0));
+
 		p->p_cycles = p->p_cycles + tsc - *__tsc_ctr_switch;
 	}
 #else
@@ -313,6 +329,8 @@ void context_stop(struct proc * p)
 	tsc_per_state[cpu][counter] += tsc_delta;
 
 	*__tsc_ctr_switch = tsc;
+
+	unlock_proc(p);
 }
 
 void context_stop_idle(void)
