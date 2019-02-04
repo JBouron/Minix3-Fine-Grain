@@ -182,15 +182,31 @@ void ktzprofile_ipc(int call_nr)
 	ktzprofile_event(translated);
 }
 
-void ktzprofile_message_type(int type) {
-	int bin_idx;
+void ktzprofile_deliver_msg(message *msg) {
+	int bin_idx, type;
+	endpoint_t src;
 	struct ktzprofile_data *data;
 
 	KTZPROFILE_CHECK_ENABLED();
+	type = msg->m_type;
+	src = msg->m_source;
 	data = &ktzprofile_per_cpu_data[__gdb_cpuid()];
+
+	/* Update msg hist. */
+	bin_idx = type;
+	if(bin_idx<=0||bin_idx>=KTZPROFILE_MSG_HIST_SIZE) {
+		/* Message of type 0 are reserved. */
+		data->msg_hist.reserved++;
+	} else {
+		data->msg_hist.bins[bin_idx]++;
+	}
+
+	/* Update range hist. */
 	bin_idx = type/KTZPROFILE_MSG_BIN_SIZE;
-	if(bin_idx<0||bin_idx>=KTZPROFILE_MSG_HIST_SIZE)
-		data->hist.invalids++;
-	else
-		data->hist.bins[bin_idx]++;
+	if(type==0||bin_idx<0||bin_idx>=KTZPROFILE_MSG_RANGE_HIST_SIZE) {
+		/* Message of type 0 are reserved. */
+		data->msg_range_hist.reserved++;
+	} else {
+		data->msg_range_hist.bins[bin_idx]++;
+	}
 }

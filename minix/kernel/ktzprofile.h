@@ -3,6 +3,7 @@
 
 #include "ktrace.h"
 #include <sys/types.h>
+#include "minix/ipc.h"
 
 /* Keep statistics of the time spent between two events A and B.
  * We keep the average and the total time spent.
@@ -26,12 +27,20 @@ struct ktzprofile_stat {
 #define KTZPROFILE_MSG_LOW 0x0
 #define KTZPROFILE_MSG_HIGH 0x1AFF
 #define KTZPROFILE_MSG_BIN_SIZE 0x100
-#define KTZPROFILE_MSG_HIST_SIZE ((KTZPROFILE_MSG_HIGH+1)/KTZPROFILE_MSG_BIN_SIZE)
-struct ktzprofile_msg_type_hist {
+#define KTZPROFILE_MSG_RANGE_HIST_SIZE ((KTZPROFILE_MSG_HIGH+1)/KTZPROFILE_MSG_BIN_SIZE)
+struct ktzprofile_msg_range_hist {
 	/* The bins. */
+	int bins[KTZPROFILE_MSG_RANGE_HIST_SIZE];
+	/* Number of invalid message type witnessed. */
+	int reserved;
+};
+
+#define KTZPROFILE_MSG_HIST_SIZE ((KTZPROFILE_MSG_HIGH+1))
+struct ktzprofile_msg_hist {
+	/* The bins (one per message type). */
 	int bins[KTZPROFILE_MSG_HIST_SIZE];
 	/* Number of invalid message type witnessed. */
-	int invalids;
+	int reserved;
 };
 
 /* Contains all the data, per cpu, used to profile the kernel. */
@@ -56,7 +65,8 @@ struct ktzprofile_data {
 	struct ktzprofile_stat ipc_stats[KTRACE_NUM_IPCS];
 
 	/* Histogram of each message type. */
-	struct ktzprofile_msg_type_hist hist;
+	struct ktzprofile_msg_hist msg_hist;
+	struct ktzprofile_msg_range_hist msg_range_hist;
 };
 
 extern struct ktzprofile_data ktzprofile_per_cpu_data[CONFIG_MAX_CPUS];
@@ -74,5 +84,5 @@ void ktzprofile_kernel_call(int call_nr);
 void ktzprofile_ipc(int call_nr);
 /* Make the profiler aware of a message type being sent.
  * This is a non timing related stat. */
-void ktzprofile_message_type(int type);
+void ktzprofile_deliver_msg(message *msg);
 #endif
