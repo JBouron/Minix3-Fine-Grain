@@ -34,6 +34,8 @@ struct proc {
   int p_new_message;		/* Has the process received a new message ? */
   int p_in_ipc_op;		/* Is this process running IPC code in kernel ? */
   int p_next_cpu;		/* To schedule migrations. */
+  int p_n_lock;			/* # of times this proc has been locked. */
+  int p_n_tries;		/* # of tries to get the lock on this proc. */
 
   int __gdb_last_cpu_flag;
   int __gdb_line;

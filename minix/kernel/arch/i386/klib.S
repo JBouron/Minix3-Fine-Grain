@@ -732,8 +732,11 @@ ENTRY(smp_get_cores)
  */
 ENTRY(arch_spinlock_lock)
 	mov	4(%esp), %eax
+	push	%ebx
+	mov	$0, %ebx
 	mov	$1, %edx
 2:
+	add	$1, %ebx
 	mov	$1, %ecx
 	xchg	%ecx, (%eax)
 	test	%ecx, %ecx
@@ -752,6 +755,8 @@ ENTRY(arch_spinlock_lock)
 	jmp	3b
 0:
 	mfence
+	mov	%ebx, %eax
+	pop %ebx
 	ret
 
 /*===========================================================================*/

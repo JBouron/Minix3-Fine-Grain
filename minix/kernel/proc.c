@@ -2537,7 +2537,9 @@ void lock_proc(struct proc *p)
 	if(!p)
 		return;
 	/* For now we bypass the reentrant locks. */
-	spinlock_lock(&(p->p_lock.lock));
+	const int tries = spinlock_lock(&(p->p_lock.lock));
+	p->p_n_lock++;
+	p->p_n_tries += tries;
 }
 
 void unlock_proc(struct proc *p)
