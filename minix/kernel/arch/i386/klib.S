@@ -759,6 +759,21 @@ ENTRY(arch_spinlock_lock)
 	pop %ebx
 	ret
 
+/* int arch_spinlock_test(u32_t *lock_data) */
+ENTRY(arch_spinlock_test)
+	mov	4(%esp), %eax
+	mov	$1, %ecx
+	xchg	%ecx, (%eax)
+	test	%ecx, %ecx
+	je	0f 
+	mov	$0, %eax
+	ret
+
+0:
+	mfence
+	mov	$1, %eax
+	ret
+
 /*===========================================================================*/
 /*				arch_spinlock_unlock	                             */
 /*===========================================================================*/

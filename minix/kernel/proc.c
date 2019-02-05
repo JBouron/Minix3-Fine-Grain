@@ -2561,14 +2561,37 @@ int proc_locked_borrow(const struct proc *p)
 	return 1;
 }
 
+static void _lock_two_procs(struct proc *p1,struct proc *p2)
+{
+	assert(p1<p2);
+
+	/* Perform two-way test-test&set. */
+retry:
+	while(p1->p_lock.lock.val&&p2->p_lock.lock.val) {}
+
+	/* Try to lock p1. */
+	if(!arch_spinlock_test(&(p1->p_lock.lock.val))) {
+		goto retry;
+	}
+
+	/* Try to lock p2. */
+	if(!arch_spinlock_test(&(p2->p_lock.lock.val))) {
+		/* Cannot lock p2, don't hold p1 and return to the test loop. */
+		unlock_proc(p1);
+		goto retry;
+	}
+}
+
 void lock_two_procs(struct proc *p1,struct proc *p2)
 {
-	if(p1<p2) {
-		lock_proc(p1);
+	if(!p1) {
 		lock_proc(p2);
+	} else if(!p2) {
+		lock_proc(p1);
+	} else if(p1<p2) {
+		_lock_two_procs(p1,p2);
 	} else if(p2<p1) {
-		lock_proc(p2);
-		lock_proc(p1);
+		_lock_two_procs(p2,p1);
 	} else {
 		/* p1==p2. */
 		lock_proc(p1);
@@ -2589,97 +2612,90 @@ void unlock_two_procs(struct proc *p1,struct proc *p2)
 	}
 }
 
-static void _sort4(struct proc *sorted[4],struct proc *p1,struct proc *p2,struct proc *p3,struct proc *p4)
+static void _sort3(struct proc **dest,struct proc *p1,struct proc *p2,struct proc *p3)
 {
-	struct proc *left[2],*right[2];	/* Subsets. */
-	int i,left_i,right_i;
-	struct proc *left_head,*right_head;
+	assert(p1!=p2&&p2!=p3&&p3!=p1);
+	struct proc *const min12 = p1<p2?p1:p2;
+	struct proc *const min23 = p2<p3?p2:p3;
+	struct proc *const min13 = p1<p3?p1:p3;
+	struct proc *const max12 = p1>p2?p1:p2;
+	struct proc *const max23 = p2>p3?p2:p3;
+	struct proc *const max13 = p1>p3?p1:p3;
 
-	if(p1<p2) {
-		left[0] = p1;
-		left[1] = p2;
+	if(min12==min23) {
+		dest[0] = p2;
+		dest[1] = min13;
+		dest[2] = max13;
+	} else if(min23==min13) {
+		dest[0] = p3;
+		dest[1] = min12;
+		dest[2] = max12;
 	} else {
-		left[0] = p2;
-		left[1] = p1;
-	}
-
-	if(p3<p4) {
-		right[0] = p3;
-		right[1] = p4;
-	} else {
-		right[0] = p4;
-		right[1] = p3;
-	}
-
-	left_i = 0;
-	right_i = 0;
-	for(i=0;i<4;++i) {
-		if(left_i<2)
-			left_head = left[left_i];
-		if(right_i<2)
-			right_head = right[right_i];
-		if(left_i<2&&right_i<2) {
-			/* Both heads are valid. */
-			if(left_head<right_head) {
-				sorted[i] = left_head;
-				left_i++;
-			} else {
-				sorted[i] = right_head;
-				right_i++;
-			}
-		} else if(left_i<2) {
-			sorted[i] = left_head;
-			left_i++;
-		} else if(right_i<2) {
-			sorted[i] = right_head;
-			right_i++;
-		} else {
-			panic("Sorting failed.");
-		}
-	}
-
-}
-
-void lock_four_procs(struct proc *p1,struct proc *p2,struct proc *p3,struct proc *p4)
-{
-	struct proc *sorted[4];
-	int i;
-	struct proc *last;
-
-	_sort4(sorted,p1,p2,p3,p4);
-
-	last = NULL;
-	for(i=0;i<4;++i) {
-		assert(last<=sorted[i]);
-		if(sorted[i]&&(i==0||sorted[i-1]!=sorted[i]))
-			lock_proc(sorted[i]);
-		last = sorted[i];
+		assert(min12==min13);
+		dest[0] = p1;
+		dest[1] = min23;
+		dest[2] = max23;
 	}
 }
 
-void unlock_four_procs(struct proc *p1,struct proc *p2,struct proc *p3,struct proc *p4)
+static void _lock_three_procs(struct proc *p1,struct proc *p2,struct proc *p3)
 {
-	struct proc *sorted[4];
-	struct proc *last;
-	int i;
-	_sort4(sorted,p1,p2,p3,p4);
-	last = NULL;
-	for(i=0;i<4;++i) {
-		assert(last<=sorted[i]);
-		if(sorted[i]&&(i==0||sorted[i-1]!=sorted[i]))
-			unlock_proc(sorted[i]);
-		last = sorted[i];
+	assert(p1<p2&&p2<p3);
+
+	/* Perform two-way test-test&set. */
+retry:
+	while(p1->p_lock.lock.val&&
+	      p2->p_lock.lock.val&&
+	      p3->p_lock.lock.val) {}
+
+	/* Try to lock p1. */
+	if(!arch_spinlock_test(&(p1->p_lock.lock.val))) {
+		goto retry;
+	}
+
+	/* Try to lock p2. */
+	if(!arch_spinlock_test(&(p2->p_lock.lock.val))) {
+		/* Cannot lock p2, don't hold p1 and return to the test loop. */
+		unlock_proc(p1);
+		goto retry;
+	}
+
+	/* Try to lock p3. */
+	if(!arch_spinlock_test(&(p3->p_lock.lock.val))) {
+		/* Cannot lock p2, don't hold p1 and return to the test loop. */
+		unlock_proc(p1);
+		unlock_proc(p2);
+		goto retry;
 	}
 }
 
 void lock_three_procs(struct proc *p1,struct proc *p2,struct proc *p3)
 {
-	lock_four_procs(p1,p2,p3,NULL);
+	if(!p1) {
+		lock_two_procs(p2,p3);
+	} else if(p1==p2||p2==p3||!p2) {
+		lock_two_procs(p1,p3);
+	} else if(p1==p3||!p3) {
+		lock_two_procs(p1,p2);
+	} else {
+		struct proc *sorted[3];
+		_sort3(sorted,p1,p2,p3);
+		_lock_three_procs(sorted[0],sorted[1],sorted[2]);
+	}
 }
 
 void unlock_three_procs(struct proc *p1,struct proc *p2,struct proc *p3)
 {
-	unlock_four_procs(p1,p2,p3,NULL);
+	if(p1==p2||p2==p3) {
+		unlock_two_procs(p1,p3);
+	} else if(p1==p3) {
+		unlock_two_procs(p1,p2);
+	} else {
+		/* No care about the order. */
+		unlock_proc(p3);
+		unlock_proc(p2);
+		unlock_proc(p1);
+	}
 }
 
 struct proc *proc_for_endpoint(endpoint_t endpt)
