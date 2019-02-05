@@ -2540,6 +2540,9 @@ void lock_proc(struct proc *p)
 	const int tries = spinlock_lock(&(p->p_lock.lock));
 	p->p_n_lock++;
 	p->p_n_tries += tries;
+#ifdef CHECK_PROC_LOCKS
+	p->p_lock.owner = cpuid;
+#endif
 }
 
 void unlock_proc(struct proc *p)
@@ -2547,18 +2550,44 @@ void unlock_proc(struct proc *p)
 	/* Passing NULL may happens when "prefetching" in mini_receive. */
 	if(!p)
 		return;
+#ifdef CHECK_PROC_LOCKS
+	assert(p->p_lock.owner==cpuid);
+	p->p_lock.owner = -1;
+#endif
 	/* For now we bypass the reentrant locks. */
 	spinlock_unlock(&(p->p_lock.lock));
 }
 
 int proc_locked(const struct proc *p)
 {
+#ifdef CHECK_PROC_LOCKS
+	/* Assert if a proc is locked by the current cpu.
+	 * We don't need to lock pseudo processes. */
+	if(!p)
+		return 1;
+	else if(p->p_endpoint==KERNEL||p->p_endpoint==SYSTEM)
+		return 1;
+	else
+		return (p->p_lock.lock.val==1&&p->p_lock.owner==cpuid);
+#else
 	return 1;
+#endif
 }
 
 int proc_locked_borrow(const struct proc *p)
 {
+#ifdef CHECK_PROC_LOCKS
+	/* Assert if a proc is locked by a remote cpu.
+	 * We don't need to lock pseudo processes. */
+	if(!p)
+		return 1;
+	else if(p->p_endpoint==KERNEL||p->p_endpoint==SYSTEM)
+		return 1;
+	else
+		return (p->p_lock.lock.val==1&&p->p_lock.owner!=cpuid);
+#else
 	return 1;
+#endif
 }
 
 static void _lock_two_procs(struct proc *p1,struct proc *p2)
@@ -2572,6 +2601,11 @@ retry:
 	/* Try to lock p1. */
 	if(!arch_spinlock_test(&(p1->p_lock.lock.val))) {
 		goto retry;
+	} else {
+#ifdef CHECK_PROC_LOCKS
+		/* We have the lock, update owner. */
+		p1->p_lock.owner = cpuid;
+#endif
 	}
 
 	/* Try to lock p2. */
@@ -2579,6 +2613,11 @@ retry:
 		/* Cannot lock p2, don't hold p1 and return to the test loop. */
 		unlock_proc(p1);
 		goto retry;
+	} else {
+#ifdef CHECK_PROC_LOCKS
+		/* We have the lock, update owner. */
+		p2->p_lock.owner = cpuid;
+#endif
 	}
 }
 
@@ -2651,6 +2690,11 @@ retry:
 	/* Try to lock p1. */
 	if(!arch_spinlock_test(&(p1->p_lock.lock.val))) {
 		goto retry;
+	} else {
+#ifdef CHECK_PROC_LOCKS
+		/* We have the lock, update owner. */
+		p1->p_lock.owner = cpuid;
+#endif
 	}
 
 	/* Try to lock p2. */
@@ -2658,6 +2702,11 @@ retry:
 		/* Cannot lock p2, don't hold p1 and return to the test loop. */
 		unlock_proc(p1);
 		goto retry;
+	} else {
+#ifdef CHECK_PROC_LOCKS
+		/* We have the lock, update owner. */
+		p2->p_lock.owner = cpuid;
+#endif
 	}
 
 	/* Try to lock p3. */
@@ -2666,6 +2715,11 @@ retry:
 		unlock_proc(p1);
 		unlock_proc(p2);
 		goto retry;
+	} else {
+#ifdef CHECK_PROC_LOCKS
+		/* We have the lock, update owner. */
+		p3->p_lock.owner = cpuid;
+#endif
 	}
 }
 
