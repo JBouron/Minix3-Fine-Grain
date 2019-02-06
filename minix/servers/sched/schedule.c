@@ -358,10 +358,6 @@ void init_scheduling(void)
 
 	balance_timeout = BALANCE_TIMEOUT * sys_hz();
 
-	/* There are 12 processes scheduled by the kernel, all running on cpu0,
-	 * take them into account. */
-	cpu_proc[0] = 12;
-
 	if ((r = sys_setalarm(balance_timeout, 0)) != OK)
 		panic("sys_setalarm failed: %d", r);
 }
