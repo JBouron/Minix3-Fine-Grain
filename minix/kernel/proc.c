@@ -2537,7 +2537,15 @@ void lock_proc(struct proc *p)
 	if(!p)
 		return;
 	/* For now we bypass the reentrant locks. */
-	const int tries = spinlock_lock(&(p->p_lock.lock));
+	int tries = 0;
+retry:
+	tries++;
+	while(p->p_lock.lock.val) {}
+
+	/* Try to lock p1. */
+	if(!arch_spinlock_test(&(p->p_lock.lock.val))) {
+		goto retry;
+	}
 	p->p_n_lock++;
 	p->p_n_tries += tries;
 #ifdef CHECK_PROC_LOCKS
