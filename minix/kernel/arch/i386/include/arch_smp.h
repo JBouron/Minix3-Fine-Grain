@@ -8,7 +8,7 @@
 #ifndef __ASSEMBLY__
 
 /* returns the current cpu id */
-#if 0
+#if 1
 #define cpuid	(((u32_t *)(((u32_t)get_stack_frame() + (K_STACK_SIZE - 1)) \
 						& ~(K_STACK_SIZE - 1)))[-1])
 #else
