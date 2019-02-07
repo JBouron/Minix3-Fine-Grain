@@ -29,9 +29,16 @@ int do_schedctl(struct proc * caller, message * m_ptr)
 		/* the kernel becomes the scheduler and starts 
 		 * scheduling the process.
 		 */
+		static int dest_cpu = 0;
 		priority = m_ptr->m_lsys_krn_schedctl.priority;
 		quantum = m_ptr->m_lsys_krn_schedctl.quantum;
-		cpu = m_ptr->m_lsys_krn_schedctl.cpu;
+
+		/* Dirty trick: We spread the system processes on all the cpus.
+		 */
+		cpu = (dest_cpu++)%ncpus;
+		if(caller==p) {
+			cpu = -1;
+		}
 
 		/* Try to schedule the process. */
 		if((r = sched_proc(p, priority, quantum, cpu, FALSE)) != OK)
