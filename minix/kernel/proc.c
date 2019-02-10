@@ -210,7 +210,6 @@ static void idle(void)
 	ktzprofile_event(KTRACE_IDLE_START);
 #if !SPROFILE
 	halt_cpu();
-	//BKL_LOCK();
 #else
 	if (!sprofiling)
 		halt_cpu();
@@ -671,11 +670,6 @@ int do_ipc(reg_t r1, reg_t r2, reg_t r3)
 	    caller_ptr->p_accounting.ipc_sync++;
 
 	    message *m = (message *)r3;
-	    if(call_nr==RECEIVE) {
-		    /* Only count the SEND side. */
-		    //ktzprofile_message_type(m->m_type);
-	    }
-
   	    return do_sync_ipc(caller_ptr, call_nr, (endpoint_t) r2, m);
   	}
   	case SENDA:

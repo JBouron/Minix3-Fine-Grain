@@ -322,9 +322,12 @@ void prot_init(void)
 {
   extern char k_boot_stktop;
 
-  /* KTZ: The sysenter leads to troubles, so ignore it for now. */
-  if(0 && _cpufeature(_CPUF_I386_SYSENTER))
+#if 0
+  /* The sysenter leads to troubles when entering the kernel,
+   * so ignore it for now. This should be an easy fix. TODO. */
+  if(_cpufeature(_CPUF_I386_SYSENTER))
 	minix_feature_flags |= MKF_I386_INTEL_SYSENTER;
+#endif
   if(_cpufeature(_CPUF_I386_SYSCALL))
 	minix_feature_flags |= MKF_I386_AMD_SYSCALL;
 
