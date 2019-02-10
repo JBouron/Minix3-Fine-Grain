@@ -1,4 +1,5 @@
 #include "ktzprofile.h"
+#include "kernel/smp.h"
 #include "include/minix/ipcconst.h" /* For IPC codes. */
 #include "include/minix/sysutil.h" /* For panic(). */
 #include "include/minix/com.h" /* For kernel call codes. */
@@ -7,8 +8,6 @@
 struct ktzprofile_data ktzprofile_per_cpu_data[CONFIG_MAX_CPUS];
 unsigned ktzprofile_enabled = 0;
 
-/* Trick to avoid build errors. */
-extern int __gdb_cpuid(void);
 extern void read_tsc_64(u64_t*);
 extern u64_t cpu_hz[CONFIG_MAX_CPUS]; 
 
@@ -16,16 +15,11 @@ extern u64_t cpu_hz[CONFIG_MAX_CPUS];
 #define min(a,b) ((a)>(b)?(b):(a))
 #define max(a,b) ((a)>(b)?(a):(b))
 
-static u64_t make64(unsigned long lo, unsigned long hi)
-{
-	return ((u64_t)hi << 32) | (u64_t)lo;
-}
-
 static inline u64_t cycles_to_usec(u64_t cycles)
 {
 	u64_t usec;
 	usec = make64(1000000,0);
-	return (usec*cycles)/cpu_hz[__gdb_cpuid()];
+	return (usec*cycles)/cpu_hz[cpuid];
 }
 
 static void init_stat(struct ktzprofile_stat *stat,int event_a,int event_b)
@@ -124,7 +118,7 @@ void ktzprofile_event(int ktrace_event)
 	u64_t now;
 
 	KTZPROFILE_CHECK_ENABLED();
-	data = &ktzprofile_per_cpu_data[__gdb_cpuid()];
+	data = &ktzprofile_per_cpu_data[cpuid];
 	read_tsc_64(&now);
 
 	if(!data->first_sample_tsc)
@@ -190,7 +184,7 @@ void ktzprofile_deliver_msg(message *msg) {
 	KTZPROFILE_CHECK_ENABLED();
 	type = msg->m_type;
 	src = msg->m_source;
-	data = &ktzprofile_per_cpu_data[__gdb_cpuid()];
+	data = &ktzprofile_per_cpu_data[cpuid];
 
 	/* Update msg hist. */
 	bin_idx = type;

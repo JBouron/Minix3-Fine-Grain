@@ -8,15 +8,8 @@
 #ifndef __ASSEMBLY__
 
 /* returns the current cpu id */
-#if 1
 #define cpuid	(((u32_t *)(((u32_t)get_stack_frame() + (K_STACK_SIZE - 1)) \
 						& ~(K_STACK_SIZE - 1)))[-1])
-#else
-#define cpuid __gdb_cpuid()
-#endif
-
-int __gdb_cpuid(void);
-
 /* 
  * in case apic or smp is disabled in boot monitor, we need to finish single cpu
  * boot using the legacy PIC

@@ -22,53 +22,6 @@
 #include "glo.h"
 
 void trampoline(void);
-
-static void fill_stack_trace(u32_t *dest, u32_t ebp, u32_t n) {
-	int i;
-	for(i = 0; i < n && ebp; ++i) {
-		u32_t calling_eip = ((u32_t *)ebp)[1];
-		dest[i] = calling_eip;
-		ebp = ((u32_t *)ebp)[0];
-	}
-	if (!ebp)
-		dest[i] = 0x0;
-}
-
-static void reset_stack_trace(u32_t *dest, u32_t n) {
-	int i;
-	for(i = 0; i < n; ++i)
-		dest[i] = 0xffffffff;
-}
-
-void __gdb_bkl_lock(spinlock_t *lock, int cpu) {
-	/* Set the lock owner and the stack trace leading to this lock event */
-	/* WARNING: This function should be called while the lock is held. */
-	u32_t ebp;
-	lock->owner = cpu;
-	lock->acquired_count ++;
-	reset_stack_trace(lock->unlock_stack_trace, SPINLOCK_MAX_STACK_DEPTH);
-	ebp = get_stack_frame();
-	fill_stack_trace(lock->lock_stack_trace, ebp, SPINLOCK_MAX_STACK_DEPTH);
-}
-
-static int __gdb_lock_sanitize = 0;
-void __gdb_bkl_unlock(spinlock_t *lock, int cpu) {
-	/* WARNING: This function should be called while the lock is held. */
-	if (__gdb_lock_sanitize) {
-		int owner = lock->owner;
-		if (owner != cpu && owner >= 0) {
-			panic("Lock owned by %d but unlocked by %d\n",
-			      owner, cpu);
-		} else if (owner == -1) {
-			/* This is not as bad, print for now. */
-			printf("Unlocking non-acquired lock\n");
-		}
-	}
-	lock->owner = -1;
-	u32_t ebp = get_stack_frame();
-	fill_stack_trace(lock->unlock_stack_trace, ebp, SPINLOCK_MAX_STACK_DEPTH);
-}
-
 /*
  * arguments for trampoline. We need to pass the logical cpu id, gdt and idt.
  * They have to be in location which is reachable using absolute addressing in
@@ -143,7 +96,6 @@ void copy_trampoline(void)
 
 extern int booting_cpu;	/* tell protect.c what to do */
 
-static int __gdb_delay_smp_start = 0;
 static void smp_start_aps(void)
 {
 	unsigned cpu;
@@ -177,11 +129,6 @@ static void smp_start_aps(void)
 	 * using the processor's apic id values.
 	 */
 	for (cpu = 0; cpu < ncpus; cpu++) {
-		if(__gdb_delay_smp_start) {
-			int __gdb_dummy = 1;
-			while(__gdb_dummy);
-		}
-
 		ap_cpu_ready = -1;
 		/* Don't send INIT/SIPI to boot cpu.  */
 		if((apicid() == cpuid2apicid[cpu]) && 

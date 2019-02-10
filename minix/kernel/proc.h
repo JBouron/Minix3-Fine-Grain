@@ -27,10 +27,6 @@ struct proc {
   volatile u32_t p_rts_flags;	/* process is runnable only if zero */
   volatile u32_t p_misc_flags;	/* flags that do not suspend the process */
 
-  int __gdb_last_cpu_flag;
-  int __gdb_line;
-  char *__gdb_file;
-
   char p_priority;		/* current process priority */
   u64_t p_cpu_time_left;	/* time left to use the cpu */
   unsigned p_quantum_size_ms;	/* assigned time quantum in ms
@@ -211,11 +207,6 @@ struct proc {
 	do {								\
 		const int rts = (rp)->p_rts_flags;			\
 		(rp)->p_rts_flags |= (f);				\
-		if(f|RTS_VMINHIBIT) {					\
-			rp->__gdb_last_cpu_flag = cpuid;		\
-			rp->__gdb_line = __LINE__;			\
-			rp->__gdb_file = __FILE__;			\
-		}							\
 		if(rts_f_is_runnable(rts) && !proc_is_runnable(rp)) {	\
 			dequeue(rp);					\
 		}							\

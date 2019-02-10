@@ -210,7 +210,6 @@ static void idle(void)
 	ktzprofile_event(KTRACE_IDLE_START);
 #if !SPROFILE
 	halt_cpu();
-	//BKL_LOCK();
 #else
 	if (!sprofiling)
 		halt_cpu();
