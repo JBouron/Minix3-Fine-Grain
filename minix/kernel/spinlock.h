@@ -32,6 +32,7 @@ typedef struct spinlock {
 #else
 void arch_spinlock_lock(atomic_t * sl);
 void arch_spinlock_unlock(atomic_t * sl);
+int arch_fetch_and_inc(atomic_t *counter);
 #define spinlock_lock(sl)	arch_spinlock_lock(&((sl)->val))
 #define spinlock_unlock(sl)	arch_spinlock_unlock(&((sl)->val))
 #endif
