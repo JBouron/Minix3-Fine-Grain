@@ -858,9 +858,6 @@ int arch_enable_paging(struct proc * caller)
 	}
 #if CONFIG_SMP
 	barrier();
-
-	// KTZ : Shouldn't be necessary.
-	//wait_for_APs_to_finish_booting();
 #endif
 #endif
 

@@ -37,10 +37,6 @@ struct proc {
   int p_n_lock;			/* # of times this proc has been locked. */
   int p_n_tries;		/* # of tries to get the lock on this proc. */
 
-  int __gdb_last_cpu_flag;
-  int __gdb_line;
-  char *__gdb_file;
-
   char p_priority;		/* current process priority */
   u64_t p_cpu_time_left;	/* time left to use the cpu */
   unsigned p_quantum_size_ms;	/* assigned time quantum in ms

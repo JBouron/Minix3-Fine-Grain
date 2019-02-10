@@ -351,7 +351,6 @@ void context_stop_idle(void)
 	if (sprofiling)
 		get_cpulocal_var(idle_interrupted) = 1;
 #endif
-	//BKL_UNLOCK();
 }
 
 u64_t ms_2_cpu_time(unsigned ms)
@@ -422,7 +421,7 @@ get_cpu_ticks(unsigned int cpu, uint64_t ticks[CPUSTATES])
 
 	/* TODO: make this inter-CPU safe! */
 	for (i = 0; i < CPUSTATES; i++) {
-
+		/* Avoid divide by 0. */
 		if (tsc_per_tick[cpu])
 			ticks[i] = tsc_per_state[cpu][i] / tsc_per_tick[cpu];
 		else

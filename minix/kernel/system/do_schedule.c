@@ -29,9 +29,6 @@ int do_schedule(struct proc * caller, message * m_ptr)
 		niced = !!(m_ptr->m_lsys_krn_schedule.niced);
 
 		res = sched_proc(p, priority, quantum, cpu, niced);
-		if(res) {
-			printf("Error sched %s on %d\n", p->p_name, cpu);
-		}
 	}	
 	unlock_proc(p);
 

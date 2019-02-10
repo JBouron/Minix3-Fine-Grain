@@ -23,49 +23,6 @@
 
 void trampoline(void);
 
-static void fill_stack_trace(u32_t *dest, u32_t ebp, u32_t n) {
-	int i;
-	for(i = 0; i < n && ebp; ++i) {
-		u32_t calling_eip = ((u32_t *)ebp)[1];
-		dest[i] = calling_eip;
-		ebp = ((u32_t *)ebp)[0];
-	}
-	if (!ebp)
-		dest[i] = 0x0;
-}
-
-static void reset_stack_trace(u32_t *dest, u32_t n) {
-	int i;
-	for(i = 0; i < n; ++i)
-		dest[i] = 0xffffffff;
-}
-
-void __gdb_bkl_lock(spinlock_t *lock, int cpu) {
-	/* Set the lock owner and the stack trace leading to this lock event */
-	/* WARNING: This function should be called while the lock is held. */
-	u32_t ebp;
-	lock->owner = cpu;
-	lock->acquired_count ++;
-	reset_stack_trace(lock->unlock_stack_trace, SPINLOCK_MAX_STACK_DEPTH);
-	ebp = get_stack_frame();
-	fill_stack_trace(lock->lock_stack_trace, ebp, SPINLOCK_MAX_STACK_DEPTH);
-}
-
-static int __gdb_lock_sanitize = 0;
-void __gdb_bkl_unlock(spinlock_t *lock, int cpu) {
-	/* WARNING: This function should be called while the lock is held. */
-	volatile int owner = lock->owner;
-	assert(owner==cpu);
-	lock->owner = -1;
-	u32_t ebp = get_stack_frame();
-	fill_stack_trace(lock->unlock_stack_trace, ebp, SPINLOCK_MAX_STACK_DEPTH);
-}
-
-static int bkl_owner = -1;
-static int bkl_acq_count = 0;
-int bkl_line = 0;
-char *bkl_file = NULL;
-
 void lock_all_procs(void)
 {
 	int p,nprocs,cpu;
@@ -75,15 +32,12 @@ void lock_all_procs(void)
 		spinlock_lock(&(proc[p].p_lock.lock));
 		proc[p].p_lock.owner = cpu;
 	}
-	bkl_owner = cpu;
-	bkl_acq_count++;
 }
 
 void unlock_all_procs(void)
 {
 	int p,nprocs,cpu;
 	cpu = cpuid;
-	bkl_owner = -1;
 	nprocs = sizeof(proc)/sizeof(struct proc);
 	for(p=0;p<nprocs;++p) {
 		assert(proc[p].p_lock.owner==cpu);
@@ -96,7 +50,6 @@ void unlock_all_procs_except(int except_proc_nr)
 {
        int p,nprocs,cpu;
        cpu = cpuid;
-       bkl_owner = -1;
        nprocs = sizeof(proc)/sizeof(struct proc);
        for(p=0;p<nprocs;++p) {
                if(proc[p].p_nr!=except_proc_nr) {
@@ -210,7 +163,6 @@ void copy_trampoline(void)
 
 extern int booting_cpu;	/* tell protect.c what to do */
 
-static int __gdb_delay_smp_start = 0;
 static void smp_start_aps(void)
 {
 	unsigned cpu;
@@ -244,11 +196,6 @@ static void smp_start_aps(void)
 	 * using the processor's apic id values.
 	 */
 	for (cpu = 0; cpu < ncpus; cpu++) {
-		if(__gdb_delay_smp_start) {
-			int __gdb_dummy = 1;
-			while(__gdb_dummy);
-		}
-
 		ap_cpu_ready = -1;
 		/* Don't send INIT/SIPI to boot cpu.  */
 		if((apicid() == cpuid2apicid[cpu]) && 
