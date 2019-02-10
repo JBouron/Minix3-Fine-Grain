@@ -43,10 +43,6 @@ EXTERN struct cpu cpus[CONFIG_MAX_CPUS];
 #define cpu_is_ready(cpu) cpu_test_flag(cpu, CPU_IS_READY)
 
 /*
- * Big Kernel Lock prevents more then one cpu executing the kernel code
- */
-SPINLOCK_DECLARE(big_kernel_lock)
-/*
  * to sync the booting APs
  */
 SPINLOCK_DECLARE(boot_lock)

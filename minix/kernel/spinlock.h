@@ -3,6 +3,7 @@
 
 #include <machine/archtypes.h>
 #include "ktzprofile.h"
+#include "bkl.h"
 
 typedef struct spinlock {
 	atomic_t val;
@@ -41,14 +42,14 @@ void arch_spinlock_unlock(atomic_t * sl);
 #define BKL_LOCK() \
 	do { \
 		ktzprofile_event(KTRACE_BKL_TRY); \
-		spinlock_lock(&big_kernel_lock); \
+		big_kernel_lock.lock(); \
 		ktzprofile_event(KTRACE_BKL_ACQUIRE); \
 	} while (0)
 
 #define BKL_UNLOCK() \
 	do { \
 		ktzprofile_event(KTRACE_BKL_RELEASE); \
-		spinlock_unlock(&big_kernel_lock); \
+		big_kernel_lock.unlock(); \
 	} while (0)
 
 #endif /* __SPINLOCK_H__ */

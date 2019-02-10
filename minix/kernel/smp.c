@@ -3,6 +3,7 @@
 #include "smp.h"
 #include "interrupt.h"
 #include "clock.h"
+#include "bkl.h"
 
 unsigned ncpus;
 unsigned ht_per_core;
@@ -23,8 +24,6 @@ static struct sched_ipi_data  sched_ipi_data[CONFIG_MAX_CPUS];
 #define SCHED_IPI_SAVE_CTX	4
 
 static volatile unsigned ap_cpus_booted;
-
-SPINLOCK_DEFINE(big_kernel_lock)
 SPINLOCK_DEFINE(boot_lock)
 
 void wait_for_APs_to_finish_booting(void)

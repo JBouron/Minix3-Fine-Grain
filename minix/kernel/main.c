@@ -214,7 +214,7 @@ void kmain(kinfo_t *local_cbi)
   cstart();
 
 #ifdef CONFIG_SMP
-  spinlock_init(&big_kernel_lock);
+  big_kernel_lock.init();
   BKL_LOCK();
 #endif
  
