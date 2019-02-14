@@ -1,0 +1,2 @@
+kernel/arch/earm/arch_clock.c restart_local_timer 178 void restart_local_timer(void )
+kernel/arch/i386/arch_clock.c restart_local_timer 168 void restart_local_timer(void )

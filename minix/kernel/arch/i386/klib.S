@@ -733,6 +733,45 @@ ENTRY(arch_fetch_and_inc)
 	// %eax contains the value of the counter before the inc.
 	ret
 
+/*===========================================================================*/
+/*				fetch_and_store				    */
+/*===========================================================================*/
+/* int fetch_and_store(void *dest, void *val)
+ * Atomically fetch the value at addr `dest` and store `val` to that address.
+ * Returns the value fetched.
+*/
+ENTRY(fetch_and_store)
+	//%ebx points to the dest addr, %eax is the new value to store.
+	mov	4(%esp), %ebx
+	mov	8(%esp), %eax
+	xchg	%eax, (%ebx)
+	// %eax already contains the old value, we can return
+	ret
+
+/*===========================================================================*/
+/*				compare_and_swap				    */
+/*===========================================================================*/
+/* int compare_and_swap(void *dest, void *expected, void *new);
+ * ATOMIC
+ * 	IF *dest == expected
+ * 		dest = new
+ *		return 1
+ * 	ELSE
+ *		return 0
+ *	ENDIF
+ * ENDATOMIC
+*/
+ENTRY(compare_and_swap)
+	mov	4(%esp), %ebx	// Dest
+	mov	8(%esp), %eax	// Expected
+	mov	12(%esp), %ecx	// New
+
+	LOCK
+	cmpxchg	%ecx, (%ebx)
+	jz 	cas_succ
+	ret
+cas_succ:
+	ret
 
 /*===========================================================================*/
 /*				arch_spinlock_lock				    */

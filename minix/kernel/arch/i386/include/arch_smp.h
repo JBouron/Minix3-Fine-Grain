@@ -10,6 +10,8 @@
 /* returns the current cpu id */
 #define cpuid	(((u32_t *)(((u32_t)get_stack_frame() + (K_STACK_SIZE - 1)) \
 						& ~(K_STACK_SIZE - 1)))[-1])
+
+int arch_cpuid(void);
 /* 
  * in case apic or smp is disabled in boot monitor, we need to finish single cpu
  * boot using the legacy PIC
