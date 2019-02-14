@@ -116,6 +116,7 @@ void bkl_mcs_unlock(void)
 bkl_t big_kernel_lock;
 void create_bkl(const char *const name)
 {
+	printf("Using %s BKL implementation.\n",name);
 	if(!strcmp(name,"spinlock")) {
 		big_kernel_lock = (bkl_t) {
 			.init = bkl_spinlock_init,
