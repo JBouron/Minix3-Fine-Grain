@@ -214,6 +214,8 @@ void kmain(kinfo_t *local_cbi)
   cstart();
 
 #ifdef CONFIG_SMP
+  const char *const bkl_name = env_get("bkl");
+  create_bkl(bkl_name?bkl_name:BKL_DEFAULT_IMPL);
   big_kernel_lock.init();
   BKL_LOCK();
 #endif

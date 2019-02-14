@@ -49,9 +49,7 @@ extern struct __cpu_local_vars {
  */
 	int pagefault_handled;
 
-#ifdef BKL_MCS
 	struct mcs_node mcs_node;
-#endif
 /*
  * which processpage tables are loaded right now. We need to know this because
  * some processes are loaded in each process pagetables and don't have their own
