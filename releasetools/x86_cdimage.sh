@@ -7,7 +7,7 @@ set -e
 #
 
 : ${ARCH=i386}
-: ${OBJ=../obj.${ARCH}}
+: ${OBJ=obj.${ARCH}}
 : ${TOOLCHAIN_TRIPLET=i586-elf32-minix-}
 : ${BUILDSH=build.sh}
 
@@ -39,8 +39,7 @@ cat >${ROOT_DIR}/boot.cfg <<END_BOOT_CFG
 banner=Welcome to the MINIX 3 installation CD
 banner================================================================================
 banner=
-menu=Regular MINIX 3:multiboot /boot/minix_default/kernel bootcd=1 cdproberoot=1
-menu=Regular MINIX 3 (with AHCI):multiboot /boot/minix_default/kernel bootcd=1 cdproberoot=1 ahci=yes
+menu=Regular MINIX 3 SMP:multiboot /boot/minix_default/kernel bootcd=1 cdproberoot=1 acpi=yes no_apic=0 ahci=yes
 menu=Edit menu option:edit
 menu=Drop to boot prompt:prompt
 clear=1
