@@ -206,10 +206,14 @@ static void idle(void)
 	}
 
 	/* start accounting for the idle time */
+	assert(big_kernel_lock.owner==cpuid);
 	context_stop(proc_addr(KERNEL));
 	ktzprofile_event(KTRACE_IDLE_START);
 
 	volatile int * v = get_cpulocal_var_ptr(idle_interrupted);
+	/* The idle_interrupted may have been set to 1 when calibrating the
+	 * clocks. Thus reset it here. */
+	*v = 0;
 	while (!*v) {
 		halt_cpu();
 		/* Minix used to assume the following: we return from the
@@ -237,6 +241,7 @@ static void idle(void)
 		 * call to halt_cpu. */
 	}
 	*v = 0;
+	assert(big_kernel_lock.owner==cpuid);
 
 	ktzprofile_event(KTRACE_IDLE_STOP);
 	/*
@@ -324,6 +329,7 @@ void switch_to_user(void)
 	int tlb_must_refresh = 0;
 #endif
 
+	assert(big_kernel_lock.owner==cpuid);
 	p = get_cpulocal_var(proc_ptr);
 	/*
 	 * if the current process is still runnable check the misc flags and let
@@ -337,6 +343,7 @@ void switch_to_user(void)
 	 * current process wasn't runnable, we pick a new one here
 	 */
 not_runnable_pick_new:
+	assert(big_kernel_lock.owner==cpuid);
 	if (proc_is_preempted(p)) {
 		p->p_rts_flags &= ~RTS_PREEMPTED;
 		if (proc_is_runnable(p)) {
@@ -354,7 +361,9 @@ not_runnable_pick_new:
 	 * process. If there is still nothing runnable we "schedule" IDLE again
 	 */
 	while (!(p = pick_proc())) {
+		assert(big_kernel_lock.owner==cpuid);
 		idle();
+		assert(big_kernel_lock.owner==cpuid);
 	}
 
 	/* update the global variable */
