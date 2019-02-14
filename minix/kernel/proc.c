@@ -208,22 +208,36 @@ static void idle(void)
 	/* start accounting for the idle time */
 	context_stop(proc_addr(KERNEL));
 	ktzprofile_event(KTRACE_IDLE_START);
-#if !SPROFILE
-	halt_cpu();
-#else
-	if (!sprofiling)
-		halt_cpu();
-	else {
-		volatile int * v;
 
-		v = get_cpulocal_var_ptr(idle_interrupted);
-		interrupts_enable();
-		while (!*v)
-			arch_pause();
+	volatile int * v = get_cpulocal_var_ptr(idle_interrupted);
+	while (!*v) {
+		halt_cpu();
+		/* Minix used to assume the following: we return from the
+		 * halt_cpu when an interrupt occured has been taken care
+		 * of (that is: BKL is held, and IF flags in EFLAGS is 0).
+		 * It turns out this is not always true, at least not in SMP
+		 * systems where it can happen that a CPU wakes up from
+		 * something that is not an NMI, nor any interrupt or INIT
+		 * signals. Which leaves us with SMI...
+		 *
+		 * In this case, we would return from halt_cpu with the
+		 * interrupt enabled and BKL not held (or at least not by
+		 * *this* cpu)!
+		 *
+		 * Thus the halt routine has been changed as follows: do not
+		 * assume anything ! Instead use the idle_interrupted cpu-
+		 * local variable to indicate that we woke up from an
+		 * interrupt. Upon returning from the halt_cpu check this
+		 * variable to know if the wake up is legitimate or not.
+		 * In case this variable is still 0 go back to the halt state,
+		 * that indicate an SMI. */
 		interrupts_disable();
-		*v = 0;
+		/* The interrupt need to be disabled so that we are sure to
+		 * avoid recieving an interrupt between the check on *v and the
+		 * call to halt_cpu. */
 	}
-#endif
+	*v = 0;
+
 	ktzprofile_event(KTRACE_IDLE_STOP);
 	/*
 	 * end of accounting for the idle task does not happen here, the kernel
