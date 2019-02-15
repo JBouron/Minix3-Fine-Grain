@@ -128,6 +128,12 @@ static void set_idle_name(char * name, int n)
 
 static message m_notify_buff = { 0, NOTIFY_MESSAGE };
 
+static void _init_proc_locks(struct proc *p)
+{
+	p->p_owner = -1;
+	ticketlock_init(&(p->p_ticketlock));
+}
+
 void proc_init(void)
 {
 	struct proc * rp;
@@ -152,8 +158,7 @@ void proc_init(void)
 		rp->p_sendto_e = NONE;		/* Proc's not blocked sending. */
 		rp->p_next_cpu = -1;
 
-		rp->p_lock.owner = -1;
-		ticketlock_init(&(rp->p_ticketlock));
+		_init_proc_locks(rp);
 
 		/* arch-specific initialization */
 		arch_proc_reset(rp);
@@ -174,8 +179,9 @@ void proc_init(void)
 		ip->p_priv = &idle_priv;
 		/* must not let idle ever get scheduled */
 		ip->p_rts_flags |= RTS_PROC_STOP;
-		ip->p_lock.owner = -1;
-		ticketlock_init(&(ip->p_ticketlock));
+
+		_init_proc_locks(ip);
+
 		set_idle_name(ip->p_name, i);
 	}
 }

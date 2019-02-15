@@ -29,7 +29,7 @@ struct proc {
   volatile u32_t p_rts_flags;	/* process is runnable only if zero */
   volatile u32_t p_misc_flags;	/* flags that do not suspend the process */
 
-  reentrantlock_t p_lock;	/* Lock for the process. */
+  spinlock_t p_spinlock;	/* Lock for the process. */
   ticketlock_t p_ticketlock;	/* Ticketlock for the process. */
   int p_enqueued;		/* Is the lock enqueued on it's cpu ? */
   int p_deliver_type;		/* What kind of message has been delivered ? */
@@ -38,6 +38,7 @@ struct proc {
   int p_next_cpu;		/* To schedule migrations. */
   int p_n_lock;			/* # of times this proc has been locked. */
   int p_n_tries;		/* # of tries to get the lock on this proc. */
+  int p_owner;			/* Which cpu holds the lock on this proc ? */
 
   char p_priority;		/* current process priority */
   u64_t p_cpu_time_left;	/* time left to use the cpu */
@@ -365,9 +366,6 @@ struct proclock_impl_t {
 	void (*const unlock_two_procs)(struct proc*,struct proc*);
 	void (*const lock_three_procs)(struct proc*,struct proc*,struct proc*);
 	void (*const unlock_three_procs)(struct proc*,struct proc*,struct proc*);
-	/* Some check functions. */
-	int (*const proc_locked)(const struct proc*);
-	int (*const proc_locked_borrow)(const struct proc*);
 };
 
 extern struct proclock_impl_t proclock_impl;

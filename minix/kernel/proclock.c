@@ -5,19 +5,45 @@
  */
 
 struct proclock_impl_t proclock_impl;
+
 /* ========================================================================= */
 /*		Entry points  						     */
 /* ========================================================================= */
+
+/*
+ * Set the owner of `p` to this cpu. Assert that `p` is not currently owned by
+ * another cpu.
+ */
+static void _set_owner(struct proc *p)
+{
+	assert(p->p_owner==-1);
+	p->p_owner = cpuid;
+}
+
+/*
+ * Give up the ownershipt of `p`. Assert that `p` in indeed owned by the
+ * current cpu.
+ */
+static void _reset_owner(struct proc *p)
+{
+	assert(p->p_owner==cpuid);
+	p->p_owner = -1;
+}
+
 void lock_proc(struct proc *p)
 {
-	if(p)
+	if(p) {
 		proclock_impl.lock_proc(p);
+		_set_owner(p);
+	}
 }
 
 void unlock_proc(struct proc *p)
 {
-	if(p)
+	if(p) {
+		_reset_owner(p);
 		proclock_impl.unlock_proc(p);
+	}
 }
 
 void lock_two_procs(struct proc *p1,struct proc *p2)
@@ -30,8 +56,12 @@ void lock_two_procs(struct proc *p1,struct proc *p2)
 		lock_proc(p1);
 	} else if(p1<p2) {
 		proclock_impl.lock_two_procs(p1,p2);
+		_set_owner(p1);
+		_set_owner(p2);
 	} else if(p2<p1) {
 		proclock_impl.lock_two_procs(p2,p1);
+		_set_owner(p1);
+		_set_owner(p2);
 	} else {
 		/* p1==p2. */
 		lock_proc(p1);
@@ -45,8 +75,12 @@ void unlock_two_procs(struct proc *p1,struct proc *p2)
 	} else if(!p2) {
 		unlock_proc(p1);
 	} else if(p1<p2) {
+		_reset_owner(p1);
+		_reset_owner(p2);
 		proclock_impl.unlock_two_procs(p1,p2);
 	} else if(p2<p1) {
+		_reset_owner(p1);
+		_reset_owner(p2);
 		proclock_impl.unlock_two_procs(p2,p1);
 	} else {
 		/* p1==p2. */
@@ -92,6 +126,9 @@ void lock_three_procs(struct proc *p1,struct proc *p2,struct proc *p3)
 		struct proc *sorted[3];
 		_sort3(sorted,p1,p2,p3);
 		proclock_impl.lock_three_procs(sorted[0],sorted[1],sorted[2]);
+		_set_owner(p1);
+		_set_owner(p2);
+		_set_owner(p3);
 	}
 }
 
@@ -106,13 +143,15 @@ void unlock_three_procs(struct proc *p1,struct proc *p2,struct proc *p3)
 	} else {
 		struct proc *sorted[3];
 		_sort3(sorted,p1,p2,p3);
+		_reset_owner(p1);
+		_reset_owner(p2);
+		_reset_owner(p3);
 		proclock_impl.unlock_three_procs(sorted[0],sorted[1],sorted[2]);
 	}
 }
 
 int proc_locked(const struct proc *p)
 {
-#ifdef CHECK_PROC_LOCKS
 	/* Assert if a proc is locked by the current cpu.
 	 * We don't need to lock pseudo processes. */
 	if(!p)
@@ -120,26 +159,21 @@ int proc_locked(const struct proc *p)
 	else if(p->p_endpoint==KERNEL||p->p_endpoint==SYSTEM)
 		return 1;
 	else
-		return proclock_impl.proc_locked(p);
-#else
-	return 1;
-#endif
+		return p->p_owner==cpuid;
 }
 
 int proc_locked_borrow(const struct proc *p)
 {
-#ifdef CHECK_PROC_LOCKS
 	/* Assert if a proc is locked by a remote cpu.
 	 * We don't need to lock pseudo processes. */
-	if(!p)
+	if(!p) {
 		return 1;
-	else if(p->p_endpoint==KERNEL||p->p_endpoint==SYSTEM)
+	} else if(p->p_endpoint==KERNEL||p->p_endpoint==SYSTEM) {
 		return 1;
-	else
-		return proclock_impl.proc_locked_borrow(p);
-#else
-	return 1;
-#endif
+	} else {
+		const int owner = p->p_owner;
+		return owner!=-1&&owner!=cpuid;
+	}
 }
 
 /* ========================================================================= */
@@ -151,25 +185,21 @@ void _sl_lock_proc(struct proc *p)
 	int tries = 0;
 retry:
 	tries++;
-	while(p->p_lock.lock.val) {}
+	while(p->p_spinlock.val) {}
 
 	/* Try to lock p1. */
-	if(!arch_spinlock_test(&(p->p_lock.lock.val))) {
+	if(!arch_spinlock_test(&(p->p_spinlock.val))) {
 		goto retry;
 	}
 	p->p_n_lock++;
 	p->p_n_tries += tries;
-	assert(p->p_lock.owner==-1);
-	p->p_lock.owner = cpuid;
 }
 
 void _sl_unlock_proc(struct proc *p)
 {
 	assert(p);
-	assert(p->p_lock.owner==cpuid);
-	p->p_lock.owner = -1;
 	/* For now we bypass the reentrant locks. */
-	spinlock_unlock(&(p->p_lock.lock));
+	spinlock_unlock(&(p->p_spinlock));
 }
 
 void _sl_lock_two_procs(struct proc *p1,struct proc *p2)
@@ -178,26 +208,18 @@ void _sl_lock_two_procs(struct proc *p1,struct proc *p2)
 
 	/* Perform two-way test-test&set. */
 retry:
-	while(p1->p_lock.lock.val&&p2->p_lock.lock.val) {}
+	while(p1->p_spinlock.val&&p2->p_spinlock.val) {}
 
 	/* Try to lock p1. */
-	if(!arch_spinlock_test(&(p1->p_lock.lock.val))) {
+	if(!arch_spinlock_test(&(p1->p_spinlock.val))) {
 		goto retry;
-	} else {
-		/* We have the lock, update owner. */
-		assert(p1->p_lock.owner==-1);
-		p1->p_lock.owner = cpuid;
 	}
 
 	/* Try to lock p2. */
-	if(!arch_spinlock_test(&(p2->p_lock.lock.val))) {
+	if(!arch_spinlock_test(&(p2->p_spinlock.val))) {
 		/* Cannot lock p2, don't hold p1 and return to the test loop. */
 		proclock_impl.unlock_proc(p1);
 		goto retry;
-	} else {
-		/* We have the lock, update owner. */
-		assert(p2->p_lock.owner==-1);
-		p2->p_lock.owner = cpuid;
 	}
 }
 
@@ -214,39 +236,27 @@ void _sl_lock_three_procs(struct proc *p1,struct proc *p2,struct proc *p3)
 
 	/* Perform two-way test-test&set. */
 retry:
-	while(p1->p_lock.lock.val&&
-	      p2->p_lock.lock.val&&
-	      p3->p_lock.lock.val) {}
+	while(p1->p_spinlock.val&&
+	      p2->p_spinlock.val&&
+	      p3->p_spinlock.val) {}
 
 	/* Try to lock p1. */
-	if(!arch_spinlock_test(&(p1->p_lock.lock.val))) {
+	if(!arch_spinlock_test(&(p1->p_spinlock.val))) {
 		goto retry;
-	} else {
-		/* We have the lock, update owner. */
-		assert(p1->p_lock.owner==-1);
-		p1->p_lock.owner = cpuid;
 	}
 
 	/* Try to lock p2. */
-	if(!arch_spinlock_test(&(p2->p_lock.lock.val))) {
+	if(!arch_spinlock_test(&(p2->p_spinlock.val))) {
 		/* Cannot lock p2, don't hold p1 and return to the test loop. */
 		proclock_impl.unlock_proc(p1);
 		goto retry;
-	} else {
-		/* We have the lock, update owner. */
-		assert(p2->p_lock.owner==-1);
-		p2->p_lock.owner = cpuid;
 	}
 
 	/* Try to lock p3. */
-	if(!arch_spinlock_test(&(p3->p_lock.lock.val))) {
+	if(!arch_spinlock_test(&(p3->p_spinlock.val))) {
 		/* Cannot lock p2, don't hold p1 and return to the test loop. */
 		proclock_impl.unlock_two_procs(p1,p2);
 		goto retry;
-	} else {
-		/* We have the lock, update owner. */
-		assert(p3->p_lock.owner==-1);
-		p3->p_lock.owner = cpuid;
 	}
 }
 
@@ -256,16 +266,6 @@ void _sl_unlock_three_procs(struct proc *p1,struct proc *p2,struct proc *p3)
 	proclock_impl.unlock_proc(p1);
 	proclock_impl.unlock_proc(p2);
 	proclock_impl.unlock_proc(p3);
-}
-
-int _sl_proc_locked(const struct proc *p)
-{
-	return (p->p_lock.lock.val==1&&p->p_lock.owner==cpuid);
-}
-
-int _sl_proc_locked_borrow(const struct proc *p)
-{
-	return (p->p_lock.lock.val==1&&p->p_lock.owner!=cpuid);
 }
 
 /* ========================================================================= */
@@ -330,8 +330,6 @@ void init_proclock_impl(const char *const name)
 			.unlock_two_procs   = _sl_unlock_two_procs,
 			.lock_three_procs   = _sl_lock_three_procs,
 			.unlock_three_procs = _sl_unlock_three_procs,
-			.proc_locked        = _sl_proc_locked,
-			.proc_locked_borrow = _sl_proc_locked_borrow,
 		};
 	} else if(!strcmp(name,"ticketlock")){
 		proclock_impl = (struct proclock_impl_t) {
@@ -341,8 +339,6 @@ void init_proclock_impl(const char *const name)
 			.unlock_two_procs   = _tl_unlock_two_procs,
 			.lock_three_procs   = _tl_lock_three_procs,
 			.unlock_three_procs = _tl_unlock_three_procs,
-			.proc_locked        = _tl_proc_locked,
-			.proc_locked_borrow = _tl_proc_locked_borrow,
 		};
 	} else {
 		panic("Unknonwn proc lock implementation name.");
