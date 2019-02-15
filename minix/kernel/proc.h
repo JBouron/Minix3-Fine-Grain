@@ -327,22 +327,62 @@ void _rts_set(struct proc *p,int flag,int lockflag);
 void _rts_unset(struct proc *p,int flag,int lockflag);
 void _rts_setflags(struct proc *p,int flag);
 
-void lock_proc(struct proc *p);
-void unlock_proc(struct proc *p);
-
-int proc_locked(const struct proc *p);
-int proc_locked_borrow(const struct proc *p);
-
-void lock_two_procs(struct proc *p1,struct proc *p2);
-void unlock_two_procs(struct proc *p1,struct proc *p2);
-
-void lock_three_procs(struct proc *p1,struct proc *p2,struct proc *p3);
-void unlock_three_procs(struct proc *p1,struct proc *p2,struct proc *p3);
-
 /* Get the proc struc corresponding to an endpoint.
  * This function will panic if the endpoint is not ok, so check your endpoints,
  * or not, I'm not your father. */
 struct proc *proc_for_endpoint(endpoint_t endpt);
+
+/* ========================================================================= */
+/*		Process locking implementation				     */
+/* ========================================================================= */
+/* Here is the implementation of the process locks.
+ * The process locking algorithm can be changed easily, all that is required
+ * is to define the function pointers in `proclock_impl`.
+ * This allow us to define multiple algos and choose one of them at boot using
+ * the kernel variables.
+ * By default the spinlock implementation is used.
+ *
+ * The "API" is as follows:
+ * 	_ The functions {un}lock_{two,three,}_proc(s) are responsible to
+ * sanitize the inputs (pointer to procs) and pass the sanitized inputs to
+ * the corresponding functions in proclock_impl.
+ * 	_ The sanitized inputs are: no NULL pointers and p1<p2<p3 at all times.
+ */
+
+#define PROCLOCK_DEFAULT_IMPL	"spinlock"
+
+/* The proclock_impl determines how 1, 2 or 3 processes are locked. */
+struct proclock_impl_t {
+	/* The lock and unlock functions.
+	 * The parameter to these functions are sanitized, that is no NULL
+	 * pointers and p1<p2<p3.
+	 */
+	void (*const lock_proc)(struct proc*);
+	void (*const unlock_proc)(struct proc*);
+	void (*const lock_two_procs)(struct proc*,struct proc*);
+	void (*const unlock_two_procs)(struct proc*,struct proc*);
+	void (*const lock_three_procs)(struct proc*,struct proc*,struct proc*);
+	void (*const unlock_three_procs)(struct proc*,struct proc*,struct proc*);
+	/* Some check functions. */
+	int (*const proc_locked)(const struct proc*);
+	int (*const proc_locked_borrow)(const struct proc*);
+};
+
+extern struct proclock_impl_t proclock_impl;
+/* Init a proclock_impl given the name of the implementation. */
+void init_proclock_impl(const char *const name);
+
+/* The entry points. These functions are responsible to sanitize the inputs
+ * before passing them to the implementation function in the proclock_impl. */
+void lock_proc(struct proc *p);
+void unlock_proc(struct proc *p);
+void lock_two_procs(struct proc *p1,struct proc *p2);
+void unlock_two_procs(struct proc *p1,struct proc *p2);
+void lock_three_procs(struct proc *p1,struct proc *p2,struct proc *p3);
+void unlock_three_procs(struct proc *p1,struct proc *p2,struct proc *p3);
+int proc_locked(const struct proc *p);
+int proc_locked_borrow(const struct proc *p);
+
 
 #endif /* __ASSEMBLY__ */
 

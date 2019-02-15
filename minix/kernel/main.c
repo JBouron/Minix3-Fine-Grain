@@ -215,6 +215,8 @@ void kmain(kinfo_t *local_cbi)
   cstart();
 
 #ifdef CONFIG_SMP
+  const char *const proclock_name = env_get("proclock");
+  init_proclock_impl(proclock_name?proclock_name:PROCLOCK_DEFAULT_IMPL);
   spinlock_init(&big_kernel_lock);
   BKL_LOCK();
 #endif
