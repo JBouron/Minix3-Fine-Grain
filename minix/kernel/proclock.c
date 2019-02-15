@@ -159,6 +159,7 @@ retry:
 	}
 	p->p_n_lock++;
 	p->p_n_tries += tries;
+	assert(p->p_lock.owner==-1);
 	p->p_lock.owner = cpuid;
 }
 
@@ -184,6 +185,7 @@ retry:
 		goto retry;
 	} else {
 		/* We have the lock, update owner. */
+		assert(p1->p_lock.owner==-1);
 		p1->p_lock.owner = cpuid;
 	}
 
@@ -194,6 +196,7 @@ retry:
 		goto retry;
 	} else {
 		/* We have the lock, update owner. */
+		assert(p2->p_lock.owner==-1);
 		p2->p_lock.owner = cpuid;
 	}
 }
@@ -220,6 +223,7 @@ retry:
 		goto retry;
 	} else {
 		/* We have the lock, update owner. */
+		assert(p1->p_lock.owner==-1);
 		p1->p_lock.owner = cpuid;
 	}
 
@@ -230,6 +234,7 @@ retry:
 		goto retry;
 	} else {
 		/* We have the lock, update owner. */
+		assert(p2->p_lock.owner==-1);
 		p2->p_lock.owner = cpuid;
 	}
 
@@ -240,6 +245,7 @@ retry:
 		goto retry;
 	} else {
 		/* We have the lock, update owner. */
+		assert(p3->p_lock.owner==-1);
 		p3->p_lock.owner = cpuid;
 	}
 }
@@ -263,6 +269,55 @@ int _sl_proc_locked_borrow(const struct proc *p)
 }
 
 /* ========================================================================= */
+/*		TICKETLOCK implementation			             */
+/* ========================================================================= */
+void _tl_lock_proc(struct proc *p)
+{
+	ticketlock_lock(&(p->p_ticketlock));
+}
+
+void _tl_unlock_proc(struct proc *p)
+{
+	ticketlock_unlock(&(p->p_ticketlock));
+}
+
+void _tl_lock_two_procs(struct proc *p1,struct proc *p2)
+{
+	_tl_lock_proc(p1);
+	_tl_lock_proc(p2);
+}
+
+void _tl_unlock_two_procs(struct proc *p1,struct proc *p2)
+{
+	_tl_unlock_proc(p1);
+	_tl_unlock_proc(p2);
+}
+
+void _tl_lock_three_procs(struct proc *p1,struct proc *p2,struct proc *p3)
+{
+	_tl_lock_proc(p1);
+	_tl_lock_proc(p2);
+	_tl_lock_proc(p3);
+}
+
+void _tl_unlock_three_procs(struct proc *p1,struct proc *p2,struct proc *p3)
+{
+	_tl_unlock_proc(p1);
+	_tl_unlock_proc(p2);
+	_tl_unlock_proc(p3);
+}
+
+int _tl_proc_locked(const struct proc *p)
+{
+	return 1;
+}
+
+int _tl_proc_locked_borrow(const struct proc *p)
+{
+	return 1;
+}
+
+/* ========================================================================= */
 /*		INIT implementation					     */
 /* ========================================================================= */
 void init_proclock_impl(const char *const name)
@@ -277,6 +332,17 @@ void init_proclock_impl(const char *const name)
 			.unlock_three_procs = _sl_unlock_three_procs,
 			.proc_locked        = _sl_proc_locked,
 			.proc_locked_borrow = _sl_proc_locked_borrow,
+		};
+	} else if(!strcmp(name,"ticketlock")){
+		proclock_impl = (struct proclock_impl_t) {
+			.lock_proc          = _tl_lock_proc,
+			.unlock_proc        = _tl_unlock_proc,
+			.lock_two_procs     = _tl_lock_two_procs,
+			.unlock_two_procs   = _tl_unlock_two_procs,
+			.lock_three_procs   = _tl_lock_three_procs,
+			.unlock_three_procs = _tl_unlock_three_procs,
+			.proc_locked        = _tl_proc_locked,
+			.proc_locked_borrow = _tl_proc_locked_borrow,
 		};
 	} else {
 		panic("Unknonwn proc lock implementation name.");

@@ -720,6 +720,20 @@ ENTRY(smp_get_cores)
 	ret
 
 /*===========================================================================*/
+/*				arch_fetch_and_inc				    */
+/*===========================================================================*/
+/* int arch_fetch_and_inc(u32_t  *counter)
+*/
+ENTRY(arch_fetch_and_inc)
+	// %ebx contains the addr of the counter.
+	mov	4(%esp), %ebx
+	mov	$1, %eax
+	LOCK
+	xadd	%eax, (%ebx)
+	// %eax contains the value of the counter before the inc.
+	ret
+
+/*===========================================================================*/
 /*				arch_spinlock_lock				    */
 /*===========================================================================*/
 /* void arch_spinlock_lock (u32_t  *lock_data)

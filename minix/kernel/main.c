@@ -212,6 +212,12 @@ void kmain(kinfo_t *local_cbi)
   assert(sizeof(kinfo.boot_procs) == sizeof(image));
   memcpy(kinfo.boot_procs, image, sizeof(kinfo.boot_procs));
 
+  /* Clear the process table. Anounce each slot as empty and set up mappings
+   * for proc_addr() and proc_nr() macros. Do the same for the table with
+   * privilege structures for the system processes and the ipc filter pool.
+   */
+  proc_init();
+
   cstart();
 
 #ifdef CONFIG_SMP
@@ -222,12 +228,6 @@ void kmain(kinfo_t *local_cbi)
 #endif
  
    DEBUGEXTRA(("main()\n"));
-
-  /* Clear the process table. Anounce each slot as empty and set up mappings
-   * for proc_addr() and proc_nr() macros. Do the same for the table with
-   * privilege structures for the system processes and the ipc filter pool.
-   */
-  proc_init();
   IPCF_POOL_INIT();
 
    if(NR_BOOT_MODULES != kinfo.mbi.mi_mods_count)

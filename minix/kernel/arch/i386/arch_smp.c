@@ -25,37 +25,27 @@ void trampoline(void);
 
 void lock_all_procs(void)
 {
-	int p,nprocs,cpu;
+	int p,nprocs;
 	nprocs = sizeof(proc)/sizeof(struct proc);
-	cpu = cpuid;
-	for(p=0;p<nprocs;++p) {
-		spinlock_lock(&(proc[p].p_lock.lock));
-		proc[p].p_lock.owner = cpu;
-	}
+	for(p=0;p<nprocs;++p)
+		lock_proc(&proc[p]);
 }
 
 void unlock_all_procs(void)
 {
-	int p,nprocs,cpu;
-	cpu = cpuid;
+	int p,nprocs;
 	nprocs = sizeof(proc)/sizeof(struct proc);
-	for(p=0;p<nprocs;++p) {
-		assert(proc[p].p_lock.owner==cpu);
-		proc[p].p_lock.owner = -1;
-		spinlock_unlock(&(proc[p].p_lock.lock));
-	}
+	for(p=0;p<nprocs;++p)
+		unlock_proc(&proc[p]);
 }
 
 void unlock_all_procs_except(int except_proc_nr)
 {
-       int p,nprocs,cpu;
-       cpu = cpuid;
+       int p,nprocs;
        nprocs = sizeof(proc)/sizeof(struct proc);
        for(p=0;p<nprocs;++p) {
                if(proc[p].p_nr!=except_proc_nr) {
-		       assert(proc[p].p_lock.owner==cpu);
-                       proc[p].p_lock.owner = -1;
-                       spinlock_unlock(&(proc[p].p_lock.lock));
+			unlock_proc(&proc[p]);
 	       }
        }
 }

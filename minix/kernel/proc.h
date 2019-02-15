@@ -19,6 +19,7 @@
 #include "const.h"
 #include "priv.h"
 #include "spinlock.h"
+#include "ticketlock.h"
 
 struct proc {
   struct stackframe_s p_reg;	/* process' registers saved in stack frame */
@@ -29,6 +30,7 @@ struct proc {
   volatile u32_t p_misc_flags;	/* flags that do not suspend the process */
 
   reentrantlock_t p_lock;	/* Lock for the process. */
+  ticketlock_t p_ticketlock;	/* Ticketlock for the process. */
   int p_enqueued;		/* Is the lock enqueued on it's cpu ? */
   int p_deliver_type;		/* What kind of message has been delivered ? */
   int p_new_message;		/* Has the process received a new message ? */
