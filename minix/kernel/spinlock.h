@@ -46,6 +46,8 @@ int arch_spinlock_lock(atomic_t * sl);
 int arch_spinlock_test(atomic_t * sl);
 void arch_spinlock_unlock(atomic_t * sl);
 int arch_fetch_and_inc(volatile atomic_t *counter);
+void *fetch_and_store(void *dest,void *val);
+void *compare_and_swap(void *dest, void *expected, void *new);
 #define spinlock_lock(sl)	arch_spinlock_lock(&((sl)->val))
 #define spinlock_unlock(sl)	arch_spinlock_unlock(&((sl)->val))
 

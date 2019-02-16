@@ -307,14 +307,60 @@ void _tl_unlock_three_procs(struct proc *p1,struct proc *p2,struct proc *p3)
 	_tl_unlock_proc(p3);
 }
 
-int _tl_proc_locked(const struct proc *p)
+/* ========================================================================= */
+/*		MCSLOCK implementation			                     */
+/* ========================================================================= */
+static mcs_node_t *_get_mcs_node(struct proc *p)
 {
-	return 1;
+	int idx;
+	if(p==&get_cpulocal_var(idle_proc)) {
+		idx = 0;
+	} else {
+		const ptrdiff_t addr_off = p-(&proc[0]);
+		/* +1 for the idle proc. */
+		idx = addr_off+1;
+	}
+	return &(get_cpulocal_var(mcs_nodes)[idx]);
 }
 
-int _tl_proc_locked_borrow(const struct proc *p)
+void _mcs_lock_proc(struct proc *p)
 {
-	return 1;
+	mcslock_t *const proc_lock = &(p->p_mcslock);
+	mcs_node_t *const I = _get_mcs_node(p);
+	mcslock_lock(proc_lock,I);
+}
+
+void _mcs_unlock_proc(struct proc *p)
+{
+	mcslock_t *const proc_lock = &(p->p_mcslock);
+	mcs_node_t *const I = _get_mcs_node(p);
+	mcslock_unlock(proc_lock,I);
+}
+
+void _mcs_lock_two_procs(struct proc *p1,struct proc *p2)
+{
+	_mcs_lock_proc(p1);
+	_mcs_lock_proc(p2);
+}
+
+void _mcs_unlock_two_procs(struct proc *p1,struct proc *p2)
+{
+	_mcs_unlock_proc(p1);
+	_mcs_unlock_proc(p2);
+}
+
+void _mcs_lock_three_procs(struct proc *p1,struct proc *p2,struct proc *p3)
+{
+	_mcs_lock_proc(p1);
+	_mcs_lock_proc(p2);
+	_mcs_lock_proc(p3);
+}
+
+void _mcs_unlock_three_procs(struct proc *p1,struct proc *p2,struct proc *p3)
+{
+	_mcs_unlock_proc(p1);
+	_mcs_unlock_proc(p2);
+	_mcs_unlock_proc(p3);
 }
 
 /* ========================================================================= */
@@ -339,6 +385,15 @@ void init_proclock_impl(const char *const name)
 			.unlock_two_procs   = _tl_unlock_two_procs,
 			.lock_three_procs   = _tl_lock_three_procs,
 			.unlock_three_procs = _tl_unlock_three_procs,
+		};
+	} else if(!strcmp(name,"mcs")){
+		proclock_impl = (struct proclock_impl_t) {
+			.lock_proc          = _mcs_lock_proc,
+			.unlock_proc        = _mcs_unlock_proc,
+			.lock_two_procs     = _mcs_lock_two_procs,
+			.unlock_two_procs   = _mcs_unlock_two_procs,
+			.lock_three_procs   = _mcs_lock_three_procs,
+			.unlock_three_procs = _mcs_unlock_three_procs,
 		};
 	} else {
 		panic("Unknonwn proc lock implementation name.");

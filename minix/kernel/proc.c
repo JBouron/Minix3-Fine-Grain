@@ -132,6 +132,7 @@ static void _init_proc_locks(struct proc *p)
 {
 	p->p_owner = -1;
 	ticketlock_init(&(p->p_ticketlock));
+	mcslock_init(&(p->p_mcslock));
 }
 
 void proc_init(void)
@@ -180,6 +181,7 @@ void proc_init(void)
 		/* must not let idle ever get scheduled */
 		ip->p_rts_flags |= RTS_PROC_STOP;
 
+		ip->p_nr = -1;			/* proc number from ptr */
 		_init_proc_locks(ip);
 
 		set_idle_name(ip->p_name, i);

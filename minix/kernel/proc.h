@@ -20,6 +20,7 @@
 #include "priv.h"
 #include "spinlock.h"
 #include "ticketlock.h"
+#include "mcs.h"
 
 struct proc {
   struct stackframe_s p_reg;	/* process' registers saved in stack frame */
@@ -31,6 +32,7 @@ struct proc {
 
   spinlock_t p_spinlock;	/* Lock for the process. */
   ticketlock_t p_ticketlock;	/* Ticketlock for the process. */
+  mcslock_t p_mcslock;		/* MCS lock for the process. */
   int p_enqueued;		/* Is the lock enqueued on it's cpu ? */
   int p_deliver_type;		/* What kind of message has been delivered ? */
   int p_new_message;		/* Has the process received a new message ? */

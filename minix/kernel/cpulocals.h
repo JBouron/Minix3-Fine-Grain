@@ -68,6 +68,9 @@ extern struct __cpu_local_vars {
 
 	int preempt_curr;		/* Should we preempt proc_ptr at the next
 					   switch_to_user ? */
+	
+	/* One node per process, +1 for the idle proc. */
+	mcs_node_t mcs_nodes[NR_TASKS+NR_PROCS+1];
 
 	int catch_pagefaults;
 
