@@ -368,6 +368,7 @@ void _mcs_unlock_three_procs(struct proc *p1,struct proc *p2,struct proc *p3)
 /* ========================================================================= */
 void init_proclock_impl(const char *const name)
 {
+	printf("Using %s for proc locks.\n",name);
 	if(!strcmp(name,"spinlock")) {
 		proclock_impl = (struct proclock_impl_t) {
 			.lock_proc          = _sl_lock_proc,
