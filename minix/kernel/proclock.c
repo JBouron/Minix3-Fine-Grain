@@ -364,6 +364,34 @@ void _mcs_unlock_three_procs(struct proc *p1,struct proc *p2,struct proc *p3)
 }
 
 /* ========================================================================= */
+/*		NO-LOCK implementation					     */
+/* ========================================================================= */
+
+void _nl_lock_proc(struct proc *p)
+{
+}
+
+void _nl_unlock_proc(struct proc *p)
+{
+}
+
+void _nl_lock_two_procs(struct proc *p1,struct proc *p2)
+{
+}
+
+void _nl_unlock_two_procs(struct proc *p1,struct proc *p2)
+{
+}
+
+void _nl_lock_three_procs(struct proc *p1,struct proc *p2,struct proc *p3)
+{
+}
+
+void _nl_unlock_three_procs(struct proc *p1,struct proc *p2,struct proc *p3)
+{
+}
+
+/* ========================================================================= */
 /*		INIT implementation					     */
 /* ========================================================================= */
 void init_proclock_impl(const char *const name)
@@ -395,6 +423,15 @@ void init_proclock_impl(const char *const name)
 			.unlock_two_procs   = _mcs_unlock_two_procs,
 			.lock_three_procs   = _mcs_lock_three_procs,
 			.unlock_three_procs = _mcs_unlock_three_procs,
+		};
+	} else if(!strcmp(name,"nolock")){
+		proclock_impl = (struct proclock_impl_t) {
+			.lock_proc          = _nl_lock_proc,
+			.unlock_proc        = _nl_unlock_proc,
+			.lock_two_procs     = _nl_lock_two_procs,
+			.unlock_two_procs   = _nl_unlock_two_procs,
+			.lock_three_procs   = _nl_lock_three_procs,
+			.unlock_three_procs = _nl_unlock_three_procs,
 		};
 	} else {
 		panic("Unknonwn proc lock implementation name.");
