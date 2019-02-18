@@ -16,7 +16,7 @@
 /*===========================================================================*
  *			      do_sigsend				     *
  *===========================================================================*/
-int do_sigsend(struct proc * caller, message * m_ptr)
+int do_sigsend_impl(struct proc * caller, message * m_ptr)
 {
 /* Handle sys_sigsend, POSIX-style signal handling. */
 
@@ -160,6 +160,14 @@ int do_sigsend(struct proc * caller, message * m_ptr)
   }
 
   return OK;
+}
+
+int do_sigsend(struct proc * caller, message * m_ptr)
+{
+	BKL_LOCK();
+	const int res = do_sigsend_impl(caller,m_ptr);
+	unlock_all_procs_except(caller->p_nr);
+	return res;
 }
 
 #endif /* USE_SIGSEND */

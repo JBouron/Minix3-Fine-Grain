@@ -16,7 +16,7 @@
 /*===========================================================================*
  *			      do_sigreturn				     *
  *===========================================================================*/
-int do_sigreturn(struct proc * caller, message * m_ptr)
+int do_sigreturn_impl(struct proc * caller, message * m_ptr)
 {
 /* POSIX style signals require sys_sigreturn to put things in order before 
  * the signalled process can resume execution
@@ -94,5 +94,14 @@ int do_sigreturn(struct proc * caller, message * m_ptr)
 
   return OK;
 }
+
+int do_sigreturn(struct proc * caller, message * m_ptr)
+{
+	BKL_LOCK();
+	const int res = do_sigreturn_impl(caller,m_ptr);
+	unlock_all_procs_except(caller->p_nr);
+	return res;
+}
+
 #endif /* USE_SIGRETURN */
 

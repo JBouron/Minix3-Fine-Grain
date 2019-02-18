@@ -22,7 +22,7 @@
 /*===========================================================================*
  *			        do_sdevio                                    *
  *===========================================================================*/
-int do_sdevio(struct proc * caller, message *m_ptr)
+int do_sdevio_impl(struct proc * caller, message *m_ptr)
 {
   vir_bytes newoffset;
   endpoint_t newep;
@@ -160,6 +160,14 @@ return_error:
   /* switch back to the address of the process which made the call */
   switch_address_space(caller);
   return retval;
+}
+
+int do_sdevio(struct proc * caller, message *m_ptr)
+{
+	BKL_LOCK();
+	const int res = do_sdevio_impl(caller,m_ptr);
+	unlock_all_procs_except(caller->p_nr);
+	return res;
 }
 
 #endif /* USE_SDEVIO */

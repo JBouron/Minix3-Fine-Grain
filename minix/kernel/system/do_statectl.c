@@ -12,7 +12,7 @@
 /*===========================================================================*
  *			          do_statectl				     *
  *===========================================================================*/
-int do_statectl(struct proc * caller, message * m_ptr)
+int do_statectl_impl(struct proc * caller, message * m_ptr)
 {
 /* Handle sys_statectl(). A process has issued a state control request. */
 
@@ -48,6 +48,14 @@ int do_statectl(struct proc * caller, message * m_ptr)
 		m_ptr->m_lsys_krn_sys_statectl.request);
 	return EINVAL;
   }
+}
+
+int do_statectl(struct proc * caller, message * m_ptr)
+{
+	BKL_LOCK();
+	const int res = do_statectl_impl(caller,m_ptr);
+	unlock_all_procs_except(caller->p_nr);
+	return res;
 }
 
 #endif /* USE_STATECTL */

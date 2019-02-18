@@ -20,7 +20,7 @@
 /*===========================================================================*
  *			      do_getmcontext				     *
  *===========================================================================*/
-int do_getmcontext(struct proc * caller, message * m_ptr)
+int do_getmcontext_impl(struct proc * caller, message * m_ptr)
 {
 /* Retrieve machine context of a process */
 
@@ -71,7 +71,7 @@ int do_getmcontext(struct proc * caller, message * m_ptr)
 /*===========================================================================*
  *			      do_setmcontext				     *
  *===========================================================================*/
-int do_setmcontext(struct proc * caller, message * m_ptr)
+int do_setmcontext_impl(struct proc * caller, message * m_ptr)
 {
 /* Set machine context of a process */
 
@@ -101,6 +101,22 @@ int do_setmcontext(struct proc * caller, message * m_ptr)
 #endif
 
   return(OK);
+}
+
+int do_getmcontext(struct proc * caller, message * m_ptr)
+{
+	BKL_LOCK();
+	const int res = do_getmcontext_impl(caller,m_ptr);
+	unlock_all_procs_except(caller->p_nr);
+	return res;
+}
+
+int do_setmcontext(struct proc * caller, message * m_ptr)
+{
+	BKL_LOCK();
+	const int res = do_setmcontext_impl(caller,m_ptr);
+	unlock_all_procs_except(caller->p_nr);
+	return res;
 }
 
 #endif

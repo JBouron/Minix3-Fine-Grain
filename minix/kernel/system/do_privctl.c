@@ -24,7 +24,7 @@ static int update_priv(struct proc *rp, struct priv *priv);
 /*===========================================================================*
  *				do_privctl				     *
  *===========================================================================*/
-int do_privctl(struct proc * caller, message * m_ptr)
+int do_privctl_impl(struct proc * caller, message * m_ptr)
 {
 /* Handle sys_privctl(). Update a process' privileges. If the process is not
  * yet a system process, make sure it gets its own privilege structure.
@@ -277,6 +277,14 @@ int do_privctl(struct proc * caller, message * m_ptr)
 		m_ptr->m_lsys_krn_sys_privctl.request);
 	return EINVAL;
   }
+}
+
+int do_privctl(struct proc * caller, message * m_ptr)
+{
+	BKL_LOCK();
+	const int res = do_privctl_impl(caller,m_ptr);
+	unlock_all_procs_except(caller->p_nr);
+	return res;
 }
 
 /*===========================================================================*

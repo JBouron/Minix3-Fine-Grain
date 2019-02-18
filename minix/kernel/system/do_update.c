@@ -34,7 +34,7 @@ static void swap_memreq(struct proc *src_rp, struct proc *dst_rp);
 /*===========================================================================*
  *				do_update				     *
  *===========================================================================*/
-int do_update(struct proc * caller, message * m_ptr)
+int do_update_impl(struct proc * caller, message * m_ptr)
 {
 /* Handle sys_update(). Update a process into another by swapping their process
  * slots.
@@ -164,6 +164,14 @@ int do_update(struct proc * caller, message * m_ptr)
 #endif
 
   return OK;
+}
+
+int do_update(struct proc * caller, message * m_ptr)
+{
+	BKL_LOCK();
+	const int res = do_update_impl(caller,m_ptr);
+	unlock_all_procs_except(caller->p_nr);
+	return res;
 }
 
 /*===========================================================================*

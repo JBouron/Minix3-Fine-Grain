@@ -33,7 +33,7 @@ static void clean_seen_flag(void)
 /*===========================================================================*
  *				do_sprofile				     *
  *===========================================================================*/
-int do_sprofile(struct proc * caller, message * m_ptr)
+int do_sprofile_impl(struct proc * caller, message * m_ptr)
 {
   int proc_nr;
   int err;
@@ -126,6 +126,14 @@ int do_sprofile(struct proc * caller, message * m_ptr)
   default:
 	return EINVAL;
   }
+}
+
+int do_sprofile(struct proc * caller, message * m_ptr)
+{
+	BKL_LOCK();
+	const int res = do_sprofile_impl(caller,m_ptr);
+	unlock_all_procs_except(caller->p_nr);
+	return res;
 }
 
 #endif /* SPROFILE */

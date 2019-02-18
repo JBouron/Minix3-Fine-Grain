@@ -96,56 +96,6 @@ static void kernel_call_finish(struct proc * caller, message *msg, int result)
   unlock_proc(caller);
 }
 
-static int is_kernel_call_optimized(int call_nr)
-{
-	/* Returns 1 if the kernel call is optimized, that is it takes only the
-	 * necessary locks instead of all of the proc locks. */
-	int i;
-	static int optimized_kernel_calls[] = {
-		SYS_DEVIO,
-		SYS_VMCTL,
-		SYS_SETALARM,
-		SYS_SCHEDULE,
-		SYS_FORK,
-		SYS_TIMES,
-		SYS_RUNCTL,
-		SYS_SCHEDCTL,
-		SYS_SETGRANT,
-		SYS_IRQCTL,
-		SYS_GETKSIG,
-		SYS_KILL,
-		SYS_ENDKSIG,
-		SYS_EXIT,
-		SYS_STIME,
-		SYS_IOPENABLE,
-		SYS_ABORT,
-		SYS_SETTIME,
-		SYS_VTIMER,
-		SYS_PHYSCOPY,
-		SYS_VIRCOPY,
-		SYS_SAFECOPYFROM,
-		SYS_SAFECOPYTO,
-		SYS_VSAFECOPY,
-		SYS_UMAP,
-		SYS_UMAP_REMOTE,
-		SYS_MEMSET,
-		SYS_SAFEMEMSET,
-		SYS_VDEVIO,
-		SYS_EXEC,
-		SYS_GETINFO,
-		SYS_DIAGCTL,
-		SYS_READBIOS,
-		/* Add optimized calls to the list ... */
-	};
-	for(i=0;
-	    i<sizeof(optimized_kernel_calls)/sizeof(*optimized_kernel_calls);
-	    ++i) {
-		if(call_nr==optimized_kernel_calls[i])
-			return 1;
-	}
-	return 0;
-}
-
 static int kernel_call_dispatch(struct proc * caller, message *msg)
 {
   int result = OK;
@@ -169,16 +119,6 @@ static int kernel_call_dispatch(struct proc * caller, message *msg)
 	  result = ECALLDENIED;			/* illegal message type */
   } else {
 	  /* handle the system call */
-
-	  int optimized = is_kernel_call_optimized(call_nr+KERNEL_CALL);
-	  if(!optimized) {
-		  /* If the kernel call is not yet optimized then acquire all
-		   * the locks of all the procs in the proc table. Otherwise
-		   * it is up to the kernel call function to take the necessary
-		   * locks. */
-		  BKL_LOCK();
-	  }
-
 	  if (call_vec[call_nr])
 		  result = (*call_vec[call_nr])(caller, msg);
 	  else {
@@ -186,19 +126,6 @@ static int kernel_call_dispatch(struct proc * caller, message *msg)
 				  call_nr, caller->p_endpoint);
 		  result = EBADREQUEST;
 	  }
-
-	  if(!optimized) {
-		  /* The kernel_call locking policy requires the lock on the
-		   * caller to be held until the kernel_call_finish. Thus for
-		   * non-optimized calls, unlock the entire proc table except
-		   * for `caller`. */
-		  unlock_all_procs_except(caller->p_nr);
-	  } else {
-		  /* The kernel call function must follow the policy, thus at
-		   * this point the lock on caller should be held. */
-		  assert(proc_locked(caller));
-	  }
-	  /* The unlock on caller will be performed by kernel_call_finish. */
   }
   /* Indicate the end of the kernel call to the profiler. */
   ktzprofile_event(KTRACE_KERNEL_CALL_END);
