@@ -19,7 +19,7 @@
 /*===========================================================================*
  *				do_vumap				     *
  *===========================================================================*/
-int do_vumap(struct proc *caller, message *m_ptr)
+int do_vumap_impl(struct proc *caller, message *m_ptr)
 {
 /* Map a vector of grants or local virtual addresses to physical addresses.
  * Designed to be used by drivers to perform an efficient lookup of physical
@@ -128,4 +128,12 @@ int do_vumap(struct proc *caller, message *m_ptr)
 	m_ptr->m_krn_lsys_sys_vumap.pcount = pcount;
 
   return r;
+}
+
+int do_vumap(struct proc *caller, message *m_ptr)
+{
+	BKL_LOCK();
+	const int res = do_vumap_impl(caller,m_ptr);
+	unlock_all_procs_except(caller->p_nr);
+	return res;
 }

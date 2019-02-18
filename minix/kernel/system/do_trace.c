@@ -17,7 +17,7 @@
 /*==========================================================================*
  *				do_trace				    *
  *==========================================================================*/
-int do_trace(struct proc * caller, message * m_ptr)
+int do_trace_impl(struct proc * caller, message * m_ptr)
 {
 /* Handle the debugging commands supported by the ptrace system call
  * The commands are:
@@ -203,6 +203,14 @@ int do_trace(struct proc * caller, message * m_ptr)
 	return(EINVAL);
   }
   return(OK);
+}
+
+int do_trace(struct proc * caller, message * m_ptr)
+{
+	BKL_LOCK();
+	const int res = do_trace_impl(caller,m_ptr);
+	unlock_all_procs_except(caller->p_nr);
+	return res;
 }
 
 #endif /* USE_TRACE */

@@ -14,7 +14,7 @@
 /*===========================================================================*
  *				do_clear				     *
  *===========================================================================*/
-int do_clear(struct proc * caller, message * m_ptr)
+int do_clear_impl(struct proc * caller, message * m_ptr)
 {
 /* Handle sys_clear. Only the PM can request other process slots to be cleared
  * when a process has exited.
@@ -77,6 +77,14 @@ int do_clear(struct proc * caller, message * m_ptr)
 #endif
 
   return OK;
+}
+
+int do_clear(struct proc * caller, message * m_ptr)
+{
+	BKL_LOCK();
+	const int res = do_clear_impl(caller,m_ptr);
+	unlock_all_procs_except(caller->p_nr);
+	return res;
 }
 
 #endif /* USE_CLEAR */
