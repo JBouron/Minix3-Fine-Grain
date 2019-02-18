@@ -322,6 +322,8 @@
 #   define GET_CPUINFO    23    /* get information about cpus */
 #   define GET_REGS	  24	/* get general process registers */
 #   define GET_CPUTICKS	  25	/* get per-state ticks for a cpu */
+#   define GET_KC_COUNT	  26	/* How many kernel calls ? */
+#   define GET_KC_NONOPTI_COUNT	  27	/* How many non optimized k calls ? */
 
 /* Subfunctions for SYS_PRIVCTL */
 #define SYS_PRIV_ALLOW		1	/* Allow process to run */

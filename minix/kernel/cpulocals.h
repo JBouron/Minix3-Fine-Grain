@@ -66,6 +66,9 @@ extern struct __cpu_local_vars {
 	int n_retries_recv;
 	int n_retries_recv_all_null;
 
+	int n_kernel_calls;		/* How many kernel calls ? */
+	int n_kernel_calls_non_opti;	/* How many kernel calls non opti ? */
+
 	int preempt_curr;		/* Should we preempt proc_ptr at the next
 					   switch_to_user ? */
 	

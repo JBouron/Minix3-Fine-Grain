@@ -162,14 +162,15 @@ static int kernel_call_dispatch(struct proc * caller, message *msg)
 	  printf("SYSTEM: illegal request %d from %d.\n",
 			  call_nr,msg->m_source);
 	  result = EBADREQUEST;			/* illegal message type */
-  }
+  /*}
   else if (!GET_BIT(priv(caller)->s_k_call_mask, call_nr)) {
 	  printf("SYSTEM: denied request %d from %d.\n",
 			  call_nr,msg->m_source);
-	  result = ECALLDENIED;			/* illegal message type */
+	  result = ECALLDENIED; */			/* illegal message type */
   } else {
 	  /* handle the system call */
 
+	  get_cpulocal_var(n_kernel_calls)++;
 	  int optimized = is_kernel_call_optimized(call_nr+KERNEL_CALL);
 	  if(!optimized) {
 		  /* If the kernel call is not yet optimized then acquire all
@@ -177,6 +178,7 @@ static int kernel_call_dispatch(struct proc * caller, message *msg)
 		   * it is up to the kernel call function to take the necessary
 		   * locks. */
 		  BKL_LOCK();
+		  get_cpulocal_var(n_kernel_calls_non_opti)++;
 	  }
 
 	  if (call_vec[call_nr])
