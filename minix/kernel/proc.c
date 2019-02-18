@@ -368,6 +368,7 @@ void switch_to_user(void)
 	 * (proc_is_runnable) because most of the time the preempted proc is
 	 * runnable. */
 	if(get_cpu_var(cpu,preempt_curr)) {
+		get_cpu_var(cpu,preempt_curr) = 0;
 		/* Set the RTS_PREEMPTED here. If the proc is also migrating
 		 * then don't bother. */
 		if(!proc_is_migrating(p)) {
