@@ -210,7 +210,6 @@ void context_stop(struct proc * p)
 	u64_t tsc, tsc_delta;
 	u64_t * __tsc_ctr_switch = get_cpulocal_var_ptr(tsc_ctr_switch);
 	unsigned int cpu, tpt, counter;
-	int unlock = 0;
 #ifdef CONFIG_SMP
 
 	cpu = cpuid;
@@ -224,8 +223,6 @@ void context_stop(struct proc * p)
 	 * for IDLE we must not hold the lock
 	 */
 	if (p == proc_addr(KERNEL)) {
-		lock_proc(p);
-		unlock = 1;
 		u64_t tmp;
 
 		read_tsc_64(&tsc);
@@ -283,25 +280,25 @@ void context_stop(struct proc * p)
 	 */
 	tpt = tsc_per_tick[cpu];
 
-	p->p_tick_cycles += tsc_delta;
-	while (tpt > 0 && p->p_tick_cycles >= tpt) {
-		p->p_tick_cycles -= tpt;
-
-		/*
-		 * The process has spent roughly a whole clock tick worth of
-		 * CPU cycles.  Update its per-process CPU utilization counter.
-		 * Some of the cycles may actually have been spent in a
-		 * previous second, but that is not a problem.
-		 */
-		cpuavg_increment(&p->p_cpuavg, kclockinfo.uptime, system_hz);
-	}
-
 	/*
 	 * deduct the just consumed cpu cycles from the cpu time left for this
 	 * process during its current quantum. Skip IDLE and other pseudo kernel
 	 * tasks, except for global accounting purposes.
 	 */
 	if (p->p_endpoint >= 0) {
+		p->p_tick_cycles += tsc_delta;
+		while (tpt > 0 && p->p_tick_cycles >= tpt) {
+			p->p_tick_cycles -= tpt;
+
+			/*
+			 * The process has spent roughly a whole clock tick worth of
+			 * CPU cycles.  Update its per-process CPU utilization counter.
+			 * Some of the cycles may actually have been spent in a
+			 * previous second, but that is not a problem.
+			 */
+			cpuavg_increment(&p->p_cpuavg, kclockinfo.uptime, system_hz);
+		}
+
 		/* On MINIX3, the "system" counter covers system processes. */
 		if (p->p_priv != priv_addr(USER_PRIV_ID))
 			counter = CP_SYS;
@@ -330,9 +327,6 @@ void context_stop(struct proc * p)
 	tsc_per_state[cpu][counter] += tsc_delta;
 
 	*__tsc_ctr_switch = tsc;
-
-	if(unlock)
-		unlock_proc(p);
 }
 
 void context_stop_idle(void)
