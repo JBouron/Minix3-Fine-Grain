@@ -36,6 +36,9 @@ struct proc {
   int p_enqueued;		/* Is the lock enqueued on it's cpu ? */
   int p_deliver_type;		/* What kind of message has been delivered ? */
   int p_new_message;		/* Has the process received a new message ? */
+  int p_pending_notif;		/* Is there a pending notification ? */
+  int p_pending_async;		/* Is there a pending async ? */
+  int p_pending_caller_q;	/* Is there a pending message in caller_q ? */
   int p_in_ipc_op;		/* Is this process running IPC code in kernel ? */
   int p_next_cpu;		/* To schedule migrations. */
   int p_n_lock;			/* # of times this proc has been locked. */

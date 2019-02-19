@@ -1077,6 +1077,7 @@ int mini_send_no_lock(
 	xpp = &dst_ptr->p_caller_q;		/* find end of list */
 	while (*xpp) xpp = &(*xpp)->p_q_link;	
 	*xpp = caller_ptr;			/* add caller to end */
+	dst_ptr->p_pending_caller_q ++;
 
 #if DEBUG_IPC_HOOK
 	hook_ipc_msgsend(&caller_ptr->p_sendmsg, caller_ptr, dst_ptr);
@@ -1166,7 +1167,7 @@ static int set_waiting_receiving(struct proc *caller_ptr, endpoint_t src_e, int 
   }
 }
 
-static int check_pending_notif(struct proc *caller_ptr,int src_e,int src_p)
+static int _check_pending_notif(struct proc *caller_ptr,int src_e,int src_p)
 {
 	/* Check for pending notifications */
 	const int src_id = has_pending_notify(caller_ptr, src_p);
@@ -1204,7 +1205,18 @@ static int check_pending_notif(struct proc *caller_ptr,int src_e,int src_p)
 	return 0; // Failure
 }
 
-static int check_pending_async(struct proc *caller_ptr,int src_e,int src_p)
+static int check_pending_notif(struct proc *caller_ptr,int src_e,int src_p)
+{
+	if (!(caller_ptr->p_misc_flags & MF_REPLY_PEND)) {
+		/* We don't need any other lock for notifs. */
+		if(_check_pending_notif(caller_ptr,src_e,src_p)) {
+			return 1;
+		}
+	}
+	return 0;
+}
+
+static int _check_pending_async(struct proc *caller_ptr,int src_e,int src_p)
 {
 	/* Check for pending asynchronous messages */
 	int r;
@@ -1220,6 +1232,24 @@ static int check_pending_async(struct proc *caller_ptr,int src_e,int src_p)
 			IPC_STATUS_ADD_CALL(caller_ptr, SENDA);
 			return 1;
 		}
+	}
+	return 0;
+}
+
+static int check_pending_async(struct proc *caller_ptr,int src_e,int src_p)
+{
+	struct proc *src_ptr;
+	if(src_p!=ANY) {
+		/* In case of non-ANY source we can already acquire the locks. */
+		src_ptr = proc_addr(src_p);
+		lock_two_procs(caller_ptr,src_ptr);
+	}
+	int r = _check_pending_async(caller_ptr,src_e,src_p);
+	if(src_p!=ANY) {
+		unlock_two_procs(caller_ptr,src_ptr);
+	}
+	if(r) {
+		return 1;
 	}
 	return 0;
 }
@@ -1361,7 +1391,6 @@ static int mini_receive_no_lock(struct proc * caller_ptr,
   const int is_non_blocking = flags&NON_BLOCKING;
   int tries = 0;
 
-retry:
   tries ++;
   assert(proc_locked(caller_ptr));
   assert(!(caller_ptr->p_misc_flags & MF_DELIVERMSG));
@@ -1391,52 +1420,45 @@ retry:
 	  return set_waiting_receiving(caller_ptr,src_e,is_non_blocking);
   }
 
-  /* Check if there are pending notifications, except for SENDREC. */
-  if (! (caller_ptr->p_misc_flags & MF_REPLY_PEND)) {
-	  /* We don't need any other lock for notifs. */
-	  if(check_pending_notif(caller_ptr,src_e,src_p)) {
-		  receive_done(caller_ptr);
-		  return OK;
+
+  do {
+	  if(caller_ptr->p_pending_notif) {
+		  if(check_pending_notif(caller_ptr,src_e,src_p)) {
+			  caller_ptr->p_pending_notif--;
+			  receive_done(caller_ptr);
+			  return OK;
+		  }
 	  }
-  }
 
-  /* Checking the async messages and the caller queue will need other locks.
-   * Which means we will have to release caller_ptr at some point.
-   * By doing so another proc may send us a message in the mean time, look at
-   * p_new_message to check if it happened. */
-  caller_ptr->p_new_message = 0;
-  unlock_proc(caller_ptr);
+	  caller_ptr->p_new_message = 0;
 
-  if(src_p!=ANY) {
-	  /* In case of non-ANY source we can already acquire the locks. */
-	  src_ptr = proc_addr(src_p);
-	  lock_two_procs(caller_ptr,src_ptr);
-  }
-  r = check_pending_async(caller_ptr,src_e,src_p);
-  if(src_p!=ANY) {
-	  unlock_two_procs(caller_ptr,src_ptr);
-  }
-  if(r) {
-	  /* We found an async message, deliver it. */
-	  lock_proc(caller_ptr); // The caller expects it.
-	  receive_done(caller_ptr);
-	  return OK;
-  }
+	  if(caller_ptr->p_pending_async) {
+		  unlock_proc(caller_ptr);
+		  const int res = check_pending_async(caller_ptr,src_e,src_p);
+		  lock_proc(caller_ptr);
+		  if(res) {
+			  caller_ptr->p_pending_async--;
+			  receive_done(caller_ptr);
+			  return OK;
+		  }
+	  }
 
-  /* Finally check the caller queue. */
-  if(check_caller_queue(caller_ptr,src_e)) {
-	  lock_proc(caller_ptr); // The caller expects it.
-	  receive_done(caller_ptr);
-	  return OK;
-  }
+	  if(caller_ptr->p_pending_caller_q) {
+		  unlock_proc(caller_ptr);
+		  const int res = check_caller_queue(caller_ptr,src_e);
+		  lock_proc(caller_ptr);
+		  if(res) {
+			  caller_ptr->p_pending_caller_q--;
+			  receive_done(caller_ptr);
+			  return OK;
+		  }
+	  }
+  } while(caller_ptr->p_new_message);
+  assert(proc_locked(caller_ptr));
 
-  /* Nothing worked, check if nobody sent a message in the meantime. If not
-   * then we can safely block. */
-  lock_proc(caller_ptr);
-  if(caller_ptr->p_new_message)
-	  goto retry;
-  else
-	  return set_waiting_receiving(caller_ptr,src_e,is_non_blocking);
+  /* If we reach this point then it means we couldn't deliver any message. Thus
+   * we need to block the caller. */
+  return set_waiting_receiving(caller_ptr,src_e,is_non_blocking);
 }
 
 /*
@@ -1555,6 +1577,7 @@ int mini_notify_no_lock(
    */ 
   src_id = priv(caller_ptr)->s_id;
   set_sys_bit(priv(dst_ptr)->s_notify_pending, src_id); 
+  dst_ptr->p_pending_notif ++;
   return(OK);
 }
 
@@ -1756,6 +1779,7 @@ retry:
 		/* Inform receiver that something is pending */
 		set_sys_bit(priv(dst_ptr)->s_asyn_pending, 
 			    priv(caller_ptr)->s_id); 
+		dst_ptr->p_pending_async ++;
 		done = FALSE;
 		/* Keep the lock on caller_ptr for the end of ite (+ the next
 		 * one). */
