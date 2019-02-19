@@ -55,7 +55,7 @@ void _reentrantlock_lock(reentrantlock_t *rl)
 {
 	int cpu = cpuid;
 	if(rl->owner-1!=cpu) {
-		spinlock_lock(&(rl->lock));
+		ticketlock_lock(&(rl->lock));
 		rl->owner = cpu+1;
 		assert(rl->n_locks==0);
 		rl->n_locks = 1;
@@ -75,7 +75,7 @@ void _reentrantlock_unlock(reentrantlock_t *rl)
 	/* Reset the owner if we don't hold this lock anymore. */
 	if(!rl->n_locks) {
 		rl->owner = 0;
-		spinlock_unlock(&(rl->lock));
+		ticketlock_unlock(&(rl->lock));
 	}
 }
 

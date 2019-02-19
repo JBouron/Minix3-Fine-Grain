@@ -3,13 +3,14 @@
 
 #include <machine/archtypes.h>
 #include "ktzprofile.h"
+#include "ticketlock.h"
 
 typedef struct spinlock {
 	atomic_t val;
 } spinlock_t;
 
 typedef struct reentrantlock {
-	spinlock_t lock;
+	ticketlock_t lock;
 	volatile int owner; /* Owner is <cpu>+1 so that the default value (0) is invalid. */
 	volatile int n_locks; /* Number of times locked by owner. */
 } reentrantlock_t;

@@ -1019,8 +1019,6 @@ int mini_send_no_lock(
 	if (!(flags & FROM_KERNEL)) {
 		if(copy_msg_from_user(m_ptr, &dst_ptr->p_delivermsg))
 			return EFAULT;
-		if(copy_msg_from_user(m_ptr, &caller_ptr->p_sendmsg))
-			return EFAULT;
 	} else {
 		dst_ptr->p_delivermsg = *m_ptr;
 		IPC_STATUS_ADD_FLAGS(dst_ptr, IPC_FLG_MSG_FROM_KERNEL);
