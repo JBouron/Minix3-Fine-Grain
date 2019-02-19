@@ -210,11 +210,10 @@ void context_stop(struct proc * p)
 	u64_t tsc, tsc_delta;
 	u64_t * __tsc_ctr_switch = get_cpulocal_var_ptr(tsc_ctr_switch);
 	unsigned int cpu, tpt, counter;
+	int unlock = 0;
 #ifdef CONFIG_SMP
 
 	cpu = cpuid;
-
-	lock_proc(p);
 
 	/*
 	 * This function is called only if we switch from kernel to user or idle
@@ -225,6 +224,8 @@ void context_stop(struct proc * p)
 	 * for IDLE we must not hold the lock
 	 */
 	if (p == proc_addr(KERNEL)) {
+		lock_proc(p);
+		unlock = 1;
 		u64_t tmp;
 
 		read_tsc_64(&tsc);
@@ -330,7 +331,8 @@ void context_stop(struct proc * p)
 
 	*__tsc_ctr_switch = tsc;
 
-	unlock_proc(p);
+	if(unlock)
+		unlock_proc(p);
 }
 
 void context_stop_idle(void)

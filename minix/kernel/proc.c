@@ -347,7 +347,13 @@ static void delivermsg(struct proc *rp)
 /*===========================================================================*
  *				switch_to_user				     * 
  *===========================================================================*/
-void switch_to_user(void)
+/**
+ * This is the implementation of switch_to_user.
+ * The curr_locked parameter specifies if proc_ptr of the current cpu is
+ * already lock by the current cpu. This is the case if we come from a kernel
+ * call or an IPC.
+ */
+static void _switch_to_user(const int curr_locked)
 {
 	/* This function is called an instant before proc_ptr is
 	 * to be scheduled again.
@@ -358,11 +364,12 @@ void switch_to_user(void)
 	const int cpu = cpuid;
 #endif
 
-	/* Send all the signals from the kernel operation we just performed. */
-	handle_all_deferred_sigs();
-
 	p = get_cpu_var(cpu,proc_ptr);
-	lock_proc(p);
+
+	if(!curr_locked)
+		lock_proc(p);
+	else
+		assert(proc_locked(p));
 
 	/* Handle the preemption here. We need to do this before the next if
 	 * (proc_is_runnable) because most of the time the preempted proc is
@@ -485,7 +492,8 @@ check_misc_flags:
 		assert(proc_is_runnable(p));
 		if (p->p_misc_flags & MF_KCALL_RESUME) {
 			kernel_call_resume(p);
-			lock_proc(p);
+			/* p has been locked by the kernel call so it is still
+			 * locked here. */
 		}
 		else if (p->p_misc_flags & MF_DELIVERMSG) {
 			TRACE(VF_SCHEDULING, printf("delivering to %s / %d\n",
@@ -565,13 +573,31 @@ check_misc_flags:
 
 	/* Check that we did not forget to send a signal. */
 	assert(get_cpu_var(cpu,sigbuffer_count)==0);
-	
+
 	/*
 	 * restore_user_context() carries out the actual mode switch from kernel
 	 * to userspace. This function does not return
 	 */
 	restore_user_context(p);
 	NOT_REACHABLE;
+}
+
+void switch_to_user(void) 
+{
+	/* This is the version called by interrupts and exceptions handlers.
+	 * Thus the current proc is not locked at this point.
+	 */
+	const int curr_locked = 0;
+	_switch_to_user(curr_locked);
+}
+
+void switch_to_user_curr_locked(void) 
+{
+	/* This is the version called by kernel call handler.
+	 * Thus the current proc _is_ locked at this point.
+	 */
+	const int curr_locked = 1;
+	_switch_to_user(curr_locked);
 }
 
 /*
@@ -2145,6 +2171,7 @@ void enqueue(
 	  if((p->p_priority>rp->p_priority)&&(priv(p)->s_flags&PREEMPTIBLE)) {
 		  smp_schedule(rp->p_cpu);
 	  }
+	  get_cpulocal_var(n_remote_preempt)++;
   }
 #endif
 
@@ -2525,8 +2552,10 @@ void _rts_set(struct proc *p,int flag,int lockflag)
 		assert(proc_locked(p));
 	p->p_rts_flags |= (flag);
 	if(!proc_is_runnable(p)&&p->p_enqueued) {
-		if(cpuid!=p->p_cpu)
+		if(cpuid!=p->p_cpu) {
+			get_cpulocal_var(n_remote_dequeue)++;
 			smp_dequeue_task(p);
+		}
 		else
 			dequeue(p);
 	}
@@ -2552,9 +2581,10 @@ void _rts_setflags(struct proc *p,int flag)
 	assert(proc_locked(p));
 	p->p_rts_flags = (flag);
 	if(proc_is_runnable(p) && (flag)) {
-		if(cpuid!=p->p_cpu)
+		if(cpuid!=p->p_cpu) {
+			get_cpulocal_var(n_remote_dequeue)++;
 			smp_dequeue_task(p);
-		else
+		} else
 			dequeue(p);
 	}
 }

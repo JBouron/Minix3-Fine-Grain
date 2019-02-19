@@ -334,7 +334,7 @@ ENTRY(kernel_call_entry_common)
 	/* restore the current process pointer and save the return value */
 	add	$8, %esp
 
-	jmp	_C_LABEL(switch_to_user)
+	jmp	_C_LABEL(switch_to_user_curr_locked)
 
 
 .balign 16

@@ -93,7 +93,6 @@ static void kernel_call_finish(struct proc * caller, message *msg, int result)
 		  }
 	  }
   }
-  unlock_proc(caller);
 }
 
 static int kernel_call_dispatch(struct proc * caller, message *msg)
