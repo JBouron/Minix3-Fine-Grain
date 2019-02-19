@@ -297,7 +297,7 @@ ENTRY(ipc_entry_common)
 	pop	%esi
 	mov     %eax, AXREG(%esi)
 
-	jmp	_C_LABEL(switch_to_user)
+	jmp	_C_LABEL(switch_to_user_curr_locked)
 
 
 /*

@@ -776,9 +776,12 @@ int do_ipc(reg_t r1, reg_t r2, reg_t r3)
   	    /* Limit size to something reasonable. An arbitrary choice is 16
   	     * times the number of process table entries.
   	     */
-  	    if (msg_size > 16*(NR_TASKS + NR_PROCS))
+  	    if (msg_size > 16*(NR_TASKS + NR_PROCS)) {
 			res = EDOM;
-	    else
+			/* When entering switch_to_user after an IPC we expect 
+			 * the caller to be locked. */
+			lock_proc(caller_ptr);
+	    } else
 		    res = mini_senda(caller_ptr, amsg, msg_size);
 	    goto end;
   	}
@@ -791,6 +794,9 @@ int do_ipc(reg_t r1, reg_t r2, reg_t r3)
 			arch_set_secondary_ipc_return(caller_ptr, minix_kerninfo_user);
 			res = OK;
 		}
+		/* When entering switch_to_user after an IPC we expect the
+		 * caller to be locked. */
+		lock_proc(caller_ptr);
 		goto end;
 	}
   	default:
@@ -1096,7 +1102,9 @@ int mini_send(
 
 	lock_two_procs(caller_ptr,dst_ptr);
 	res = mini_send_no_lock(caller_ptr,dst_e,m_ptr,flags);
-	unlock_two_procs(caller_ptr,dst_ptr);
+	unlock_proc(dst_ptr);
+	/* We keep the lock on `caller`, it will be unlocked in switch_to_user.
+	 * Doing so we avoid unnecessary unlock-locks which add up. */
 
 	return res;
 }
@@ -1134,12 +1142,8 @@ static int mini_sendrec(struct proc *caller_ptr, endpoint_t src,
 	 * receive is not ANY. */
 
 	lock_two_procs(caller_ptr,other_ptr);
-	res = mini_sendrec_no_lock(caller_ptr,other_ptr,m_buff_usr,flags);
-
-	/* other_ptr has been unlocked in mini_sendrec_no_lock. */
-	unlock_proc(caller_ptr);
-
-	return res;
+	return mini_sendrec_no_lock(caller_ptr,other_ptr,m_buff_usr,flags);
+	/* other_ptr is unlocked by mini_sendrec_no_lock. */
 }
 
 /*===========================================================================*
@@ -1495,9 +1499,7 @@ static int mini_receive(struct proc * caller_ptr,
 			const int flags)
 {
 	lock_proc(caller_ptr);
-	const int res = mini_receive_no_lock(caller_ptr,src_e,m_buff_usr,flags);
-	unlock_proc(caller_ptr);
-	return res;
+	return mini_receive_no_lock(caller_ptr,src_e,m_buff_usr,flags);
 }
 
 /*===========================================================================*
@@ -1572,7 +1574,9 @@ int mini_notify(
 
 	lock_two_procs(caller_ptr,dst_ptr);
 	res = mini_notify_no_lock(caller_ptr,dst_e);
-	unlock_two_procs(caller_ptr,dst_ptr);
+	unlock_proc(dst_ptr);
+	/* We keep the lock on `caller`, it will be unlocked in switch_to_user.
+	 * Doing so we avoid unnecessary unlock-locks which add up. */
 
 	return res;
 }
@@ -1813,10 +1817,7 @@ static int mini_senda(struct proc *caller_ptr, asynmsg_t *table, size_t size)
 	int res;
 
 	lock_proc(caller_ptr);
-	res = mini_senda_no_lock(caller_ptr,table,size);
-	unlock_proc(caller_ptr);
-
-	return res;
+	return mini_senda_no_lock(caller_ptr,table,size);
 }
 
 
