@@ -53,18 +53,12 @@ void nmi_watchdog_handler(struct nmi_frame * frame)
 {
 	smp_sched_handler();
 #if SPROFILE
-	/*
-	 * Do not check for lockups while profiling, it is extremely likely that
-	 * a false positive is detected if the frequency is high
-	 */
 	if(watchdog_enabled) {
 		if(sprofiling) {
 			/* Gather stats and re-init the timer for the next
 			 * NMI. */
 			nmi_sprofile_handler(frame);
 			watchdog->reinit(cpuid/*UNUSED*/);
-		} else {
-			lockup_check(frame);
 		}
 	}
 #else
