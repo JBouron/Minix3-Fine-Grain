@@ -53,25 +53,17 @@ void unlock_all_procs_except(int except_proc_nr)
 
 void _reentrantlock_lock(reentrantlock_t *rl)
 {
-	int cpu = cpuid;
-	if(rl->owner-1!=cpu) {
+	const int this_owner = cpuid+1;
+	if(rl->owner!=this_owner) {
 		ticketlock_lock(&(rl->lock));
-		rl->owner = cpu+1;
-		assert(rl->n_locks==0);
-		rl->n_locks = 1;
-	} else {
-		/* We already hold this lock, simply update n_locks. */
-		rl->n_locks++;
+		rl->owner = this_owner;
 	}
-	assert(rl->owner>0);
+	rl->n_locks++;
 }
 
 void _reentrantlock_unlock(reentrantlock_t *rl)
 {
-	int cpu = cpuid;
-	assert(rl->owner-1==cpu);
 	rl->n_locks--;
-
 	/* Reset the owner if we don't hold this lock anymore. */
 	if(!rl->n_locks) {
 		rl->owner = 0;
