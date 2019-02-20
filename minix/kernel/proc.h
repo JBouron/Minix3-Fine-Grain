@@ -385,8 +385,11 @@ void lock_two_procs(struct proc *p1,struct proc *p2);
 void unlock_two_procs(struct proc *p1,struct proc *p2);
 void lock_three_procs(struct proc *p1,struct proc *p2,struct proc *p3);
 void unlock_three_procs(struct proc *p1,struct proc *p2,struct proc *p3);
-int proc_locked(const struct proc *p);
-int proc_locked_borrow(const struct proc *p);
+
+/* Assert that the process p is locked by the current cpu and a remote cpu
+ * respectively. */
+void assert_proc_locked(const struct proc *p);
+void assert_proc_locked_borrow(const struct proc *p);
 
 
 #endif /* __ASSEMBLY__ */

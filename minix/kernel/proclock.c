@@ -16,8 +16,10 @@ struct proclock_impl_t proclock_impl;
  */
 static void _set_owner(struct proc *p)
 {
+#ifdef PROC_LOCK_CHECKS
 	assert(p->p_owner==-1);
 	p->p_owner = cpuid;
+#endif
 }
 
 /*
@@ -26,8 +28,10 @@ static void _set_owner(struct proc *p)
  */
 static void _reset_owner(struct proc *p)
 {
+#ifdef PROC_LOCK_CHECKS
 	assert(p->p_owner==cpuid);
 	p->p_owner = -1;
+#endif
 }
 
 void lock_proc(struct proc *p)
@@ -150,30 +154,26 @@ void unlock_three_procs(struct proc *p1,struct proc *p2,struct proc *p3)
 	}
 }
 
-int proc_locked(const struct proc *p)
+void assert_proc_locked(const struct proc *p)
 {
 	/* Assert if a proc is locked by the current cpu.
 	 * We don't need to lock pseudo processes. */
-	if(!p)
-		return 1;
-	else if(p->p_endpoint==KERNEL||p->p_endpoint==SYSTEM)
-		return 1;
-	else
-		return p->p_owner==cpuid;
+#ifdef PROC_LOCK_CHECKS
+	if(p&&p->p_endpoint!=KERNEL&&p->p_endpoint!=SYSTEM)
+		assert(p->p_owner==cpuid);
+#endif
 }
 
-int proc_locked_borrow(const struct proc *p)
+void assert_proc_locked_borrow(const struct proc *p)
 {
 	/* Assert if a proc is locked by a remote cpu.
 	 * We don't need to lock pseudo processes. */
-	if(!p) {
-		return 1;
-	} else if(p->p_endpoint==KERNEL||p->p_endpoint==SYSTEM) {
-		return 1;
-	} else {
+#ifdef PROC_LOCK_CHECKS
+	if(p&&p->p_endpoint!=KERNEL&&p->p_endpoint!=SYSTEM) {
 		const int owner = p->p_owner;
-		return owner!=-1&&owner!=cpuid;
+		assert(owner!=-1&&owner!=cpuid);
 	}
+#endif
 }
 
 /* ========================================================================= */

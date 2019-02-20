@@ -60,7 +60,7 @@ static void kernel_call_finish(struct proc * caller, message *msg, int result)
 {
   /* The lock on caller must be held since the start of the kernel call.
    * Every other lock should be released by now. */
-  assert(proc_locked(caller));
+  assert_proc_locked(caller);
   if(result == VMSUSPEND) {
 	  /* Special case: message has to be saved for handling
 	   * until VM tells us it's allowed. VM has been notified
@@ -746,7 +746,7 @@ void kernel_call_resume(struct proc *caller)
  *===========================================================================*/
 int sched_proc(struct proc *p, int priority, int quantum, int cpu, int niced)
 {
-	assert(proc_locked(p));
+	assert_proc_locked(p);
 	/* Make sure the values given are within the allowed range.*/
 	if ((priority < TASK_Q && priority != -1) || priority > NR_SCHED_QUEUES)
 		return(EINVAL);

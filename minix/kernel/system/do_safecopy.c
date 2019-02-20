@@ -57,7 +57,7 @@ int verify_grant(
 	int grant_idx, grant_seq;
 	int depth = 0;
 
-	assert(proc_locked(caller));
+	assert_proc_locked(caller);
 
 	do {
 		/* Get granter process slot (if valid), and check range of
@@ -74,7 +74,7 @@ int verify_grant(
 			return(EINVAL);
 		}
 		granter_proc = proc_addr(proc_nr);
-		assert(proc_locked(granter_proc));
+		assert_proc_locked(granter_proc);
 
 		/* If the granter has a temporary grant table, always allow
 		 * requests with unspecified access and return ENOTREADY if

@@ -164,7 +164,7 @@ void smp_schedule_migrate_proc(struct proc * p, unsigned dest_cpu)
 	 * stop the processes and force the complete context of the process to
 	 * be saved (i.e. including FPU state and such)
 	 */
-	assert(proc_locked(p));
+	assert_proc_locked(p);
 	/* The proc should not be in a middle of a migration already. */
 	assert(!(p->p_rts_flags&RTS_PROC_MIGR));
 	assert(p->p_cpu!=cpuid);
@@ -182,7 +182,7 @@ void smp_schedule_migrate_proc(struct proc * p, unsigned dest_cpu)
 void smp_dequeue_task(struct proc *p)
 {
 	assert(p->p_enqueued);
-	assert(proc_locked(p));
+	assert_proc_locked(p);
 	smp_schedule_sync(p,SCHED_IPI_DEQUEUE);
 	assert(!p->p_enqueued);
 }
@@ -203,7 +203,7 @@ void smp_sched_handler(void)
 
 		/* The cpu triggering this NMI must always have the lock on the
 		 * proc. */
-		assert(proc_locked_borrow(p));
+		assert_proc_locked_borrow(p);
 
 		if (flgs & SCHED_IPI_STOP_PROC) {
 			RTS_SET_BORROW(p, RTS_PROC_STOP);

@@ -284,8 +284,8 @@ void vm_suspend(struct proc *caller, const struct proc *target,
         /* This range is not OK for this process. Set parameters
          * of the request and notify VM about the pending request.
          */
-	assert(proc_locked(caller));
-	assert(proc_locked(target));
+	assert_proc_locked(caller);
+	assert_proc_locked(target);
         assert(!RTS_ISSET(caller, RTS_VMREQUEST));
         assert(!RTS_ISSET(target, RTS_VMREQUEST));
 
@@ -369,7 +369,7 @@ static void _switch_to_user(const int curr_locked)
 	if(!curr_locked)
 		lock_proc(p);
 	else
-		assert(proc_locked(p));
+		assert_proc_locked(p);
 
 	/* Handle the preemption here. We need to do this before the next if
 	 * (proc_is_runnable) because most of the time the preempted proc is
@@ -406,7 +406,7 @@ not_runnable_pick_new:
 		lock_proc(p);
 	}
 
-	assert(proc_locked(p));
+	assert_proc_locked(p);
 	if (proc_is_migrating(p)) {
 		/* Somebody wants to migrate this process. now that its
 		 * time-slice or kernel operation is over we can migrate it. */
@@ -1000,8 +1000,8 @@ int mini_send_no_lock(
   dst_p = _ENDPOINT_P(dst_e);
   dst_ptr = proc_addr(dst_p);
 
-  assert(proc_locked(caller_ptr));
-  assert(proc_locked(dst_ptr));
+  assert_proc_locked(caller_ptr);
+  assert_proc_locked(dst_ptr);
 
   if (RTS_ISSET(dst_ptr, RTS_NO_ENDPOINT))
   {
@@ -1116,7 +1116,7 @@ static int mini_sendrec_no_lock(struct proc *caller_ptr, struct proc *to,
 {
 	int other_p,result;
 	const int src = to->p_endpoint;
-	assert(proc_locked(caller_ptr));
+	assert_proc_locked(caller_ptr);
 	/* A flag is set so that notifications cannot interrupt SENDREC. */
 	caller_ptr->p_misc_flags |= MF_REPLY_PEND;
 	result = mini_send_no_lock(caller_ptr, src, m_buff_usr, 0);
@@ -1266,8 +1266,8 @@ static int check_caller_queue(struct proc *caller_ptr,int src_e)
 		if(src_ptr->p_sendto_e==caller_ptr->p_endpoint) {
 			/* The source is indeed in the caller chain. */
 			assert(CANRECEIVE(src_e, src_e, caller_ptr, 0, &src_ptr->p_sendmsg));
-			assert(proc_locked(src_ptr));
-			assert(proc_locked(caller_ptr));
+			assert_proc_locked(src_ptr);
+			assert_proc_locked(caller_ptr);
 			assert(!RTS_ISSET(src_ptr, RTS_SLOT_FREE));
 			assert(!RTS_ISSET(src_ptr, RTS_NO_ENDPOINT));
 
@@ -1327,8 +1327,8 @@ static int check_caller_queue(struct proc *caller_ptr,int src_e)
 		// not occur that often (or never).
 		assert(caller_ptr->p_caller_q==first);
 		assert(CANRECEIVE(src_e, first_e, caller_ptr, 0, &first->p_sendmsg));
-		assert(proc_locked(first));
-		assert(proc_locked(caller_ptr));
+		assert_proc_locked(first);
+		assert_proc_locked(caller_ptr);
 		assert(!RTS_ISSET(first, RTS_SLOT_FREE));
 		assert(!RTS_ISSET(first, RTS_NO_ENDPOINT));
 
@@ -1390,7 +1390,7 @@ static int mini_receive_no_lock(struct proc * caller_ptr,
   int tries = 0;
 
   tries ++;
-  assert(proc_locked(caller_ptr));
+  assert_proc_locked(caller_ptr);
   assert(!(caller_ptr->p_misc_flags & MF_DELIVERMSG));
 
   /* This is where we want our message. */
@@ -1452,7 +1452,7 @@ static int mini_receive_no_lock(struct proc * caller_ptr,
 		  }
 	  }
   } while(caller_ptr->p_new_message);
-  assert(proc_locked(caller_ptr));
+  assert_proc_locked(caller_ptr);
 
   /* If we reach this point then it means we couldn't deliver any message. Thus
    * we need to block the caller. */
@@ -1543,7 +1543,7 @@ int mini_notify_no_lock(
   dst_ptr = proc_addr(dst_p);
   dst_ptr->p_new_message = 1;
 
-  assert(proc_locked(dst_ptr));
+  assert_proc_locked(dst_ptr);
 
   /* Check to see if target is blocked waiting for this message. A process 
    * can be both sending and receiving during a SENDREC system call.
@@ -1648,7 +1648,7 @@ int try_deliver_senda(struct proc *caller_ptr,
   const vir_bytes table_v = (vir_bytes) table;
   message *m_ptr = NULL;
 
-  assert(proc_locked(caller_ptr));
+  assert_proc_locked(caller_ptr);
 
   privp = priv(caller_ptr);
 
@@ -1674,7 +1674,7 @@ int try_deliver_senda(struct proc *caller_ptr,
   for (i = 0; i < size; i++) {
 	/* Process each entry in the table and store the result in the table.
 	 * If we're done handling a message, copy the result to the sender. */
-	assert(proc_locked(caller_ptr));
+	assert_proc_locked(caller_ptr);
 
 	dst = NONE;
 	/* Copy message to kernel */
@@ -1747,7 +1747,7 @@ retry:
 	if (r == OK && RTS_ISSET(dst_ptr, RTS_NO_ENDPOINT)) {
 		r = EDEADSRCDST;
 	}
-	assert(proc_locked(dst_ptr));
+	assert_proc_locked(dst_ptr);
 
 	/* Check if 'dst' is blocked waiting for this message.
 	 * If AMF_NOREPLY is set, do not satisfy the receiving part of
@@ -1802,7 +1802,7 @@ asyn_error:
 	else
 		printf("KERNEL senda error %d\n", r);
   }
-  assert(proc_locked(caller_ptr));
+  assert_proc_locked(caller_ptr);
 
   if (do_notify) 
 	mini_notify_no_lock(proc_addr(ASYNCM), caller_ptr->p_endpoint);
@@ -1904,8 +1904,8 @@ static int try_one(endpoint_t receive_e, struct proc *src_ptr,
   asynmsg_t tabent;
   vir_bytes table_v;
 
-  assert(proc_locked(src_ptr));
-  assert(proc_locked(dst_ptr));
+  assert_proc_locked(src_ptr);
+  assert_proc_locked(dst_ptr);
 
   privp = priv(src_ptr);
   if (!(privp->s_flags & SYS_PROC)) return(EPERM);
@@ -2006,7 +2006,7 @@ store_result:
 	privp->s_asyntab = -1;
 	privp->s_asynsize = 0;
   } else {
-	assert(proc_locked(dst_ptr));
+	assert_proc_locked(dst_ptr);
 	set_sys_bit(priv(dst_ptr)->s_asyn_pending, privp->s_id);
   }
 
@@ -2030,8 +2030,8 @@ int cancel_async(struct proc *src_ptr, struct proc *dst_ptr)
   asynmsg_t tabent;
   vir_bytes table_v;
 
-  assert(proc_locked(src_ptr));
-  assert(proc_locked(dst_ptr));
+  assert_proc_locked(src_ptr);
+  assert_proc_locked(dst_ptr);
 
   privp = priv(src_ptr);
   if (!(privp->s_flags & SYS_PROC)) return(EPERM);
@@ -2434,8 +2434,8 @@ static void notify_scheduler(struct proc *p)
 	message m_no_quantum;
 	int err;
 
-	assert(proc_locked(p));
-	assert(proc_locked(p->p_scheduler));
+	assert_proc_locked(p);
+	assert_proc_locked(p->p_scheduler);
 
 	assert(!proc_kernel_scheduler(p));
 
@@ -2468,7 +2468,7 @@ static void notify_scheduler(struct proc *p)
 
 void proc_no_time(struct proc * p)
 {
-	assert(proc_locked(p));
+	assert_proc_locked(p);
 	if (!proc_kernel_scheduler(p) && priv(p)->s_flags & PREEMPTIBLE) {
 		/* this dequeues the process */
 		unlock_proc(p);
@@ -2570,9 +2570,9 @@ void sink(void)
 void _rts_set(struct proc *p,int flag,int lockflag)
 {
 	if(lockflag==1)
-		assert(proc_locked_borrow(p));
+		assert_proc_locked_borrow(p);
 	else if(lockflag==2)
-		assert(proc_locked(p));
+		assert_proc_locked(p);
 	p->p_rts_flags |= (flag);
 	if(!proc_is_runnable(p)&&p->p_enqueued) {
 		if(cpuid!=p->p_cpu) {
@@ -2589,9 +2589,9 @@ void _rts_unset(struct proc *p,int flag,int lockflag)
 {
 	int rts;
 	if(lockflag==1)
-		assert(proc_locked_borrow(p));
+		assert_proc_locked_borrow(p);
 	else if(lockflag==2)
-		assert(proc_locked(p));
+		assert_proc_locked(p);
 	rts = p->p_rts_flags;
 	p->p_rts_flags &= ~(flag);
 	if(!rts_f_is_runnable(rts) && proc_is_runnable(p)) {
@@ -2601,7 +2601,7 @@ void _rts_unset(struct proc *p,int flag,int lockflag)
 
 void _rts_setflags(struct proc *p,int flag)
 {
-	assert(proc_locked(p));
+	assert_proc_locked(p);
 	p->p_rts_flags = (flag);
 	if(proc_is_runnable(p) && (flag)) {
 		if(cpuid!=p->p_cpu) {
