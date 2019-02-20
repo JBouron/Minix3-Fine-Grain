@@ -151,11 +151,11 @@
 #define PG_ALLOCATEME ((phys_bytes)-1)
 
 /* MSRs */
-#define INTEL_MSR_PERFMON_CRT0         0xc1
+#define INTEL_MSR_PERFMON_CRT0         0xc1 /* IA32_PMC0 */
 #define INTEL_MSR_SYSENTER_CS         0x174
 #define INTEL_MSR_SYSENTER_ESP        0x175
 #define INTEL_MSR_SYSENTER_EIP        0x176
-#define INTEL_MSR_PERFMON_SEL0        0x186
+#define INTEL_MSR_PERFMON_SEL0        0x186 /* IA32_PERFEVTSEL0 */
 
 #define INTEL_MSR_PERFMON_SEL0_ENABLE (1 << 22)
 

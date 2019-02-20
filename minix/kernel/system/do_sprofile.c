@@ -71,6 +71,9 @@ int do_sprofile_impl(struct proc * caller, message * m_ptr)
 		m_ptr->m_lsys_krn_sys_sprof.mem_size < SAMPLE_BUFFER_SIZE ?
 		m_ptr->m_lsys_krn_sys_sprof.mem_size : SAMPLE_BUFFER_SIZE;
 
+	/* We need to set sprofiling _before_ enabling any perf counter.
+	 * Otherwise we may miss the first tick ! */
+	sprofiling = 1;
 	switch (sprofiling_type = m_ptr->m_lsys_krn_sys_sprof.intr_type) {
 		case PROF_RTC:
 			init_profile_clock(m_ptr->m_lsys_krn_sys_sprof.freq);
@@ -85,8 +88,6 @@ int do_sprofile_impl(struct proc * caller, message * m_ptr)
 			printf("ERROR : unknown profiling interrupt type\n");
 			return EINVAL;
 	}
-	
-	sprofiling = 1;
 
 	clean_seen_flag();
 
