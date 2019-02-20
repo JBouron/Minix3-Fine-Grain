@@ -213,15 +213,16 @@ static void idle(void)
 	 * the CPU utilization of certain workloads with high precision.
 	 */
 
-	p = get_cpulocal_var(proc_ptr) = get_cpulocal_var_ptr(idle_proc);
+	const int cpu = cpuid;
+	p = get_cpu_var(cpu,proc_ptr) = get_cpu_var_ptr(cpu,idle_proc);
 	if (priv(p)->s_flags & BILLABLE)
-		get_cpulocal_var(bill_ptr) = p;
+		get_cpu_var(cpu,bill_ptr) = p;
 
 	switch_address_space_idle();
 
 #ifdef CONFIG_SMP
 	/* we don't need to keep time on APs as it is handled on the BSP */
-	if (cpuid != bsp_cpu_id)
+	if (cpu != bsp_cpu_id)
 		stop_local_timer();
 	else
 #endif
@@ -237,7 +238,7 @@ static void idle(void)
 	context_stop(proc_addr(KERNEL));
 	ktzprofile_event(KTRACE_IDLE_START);
 
-	volatile int * v = get_cpulocal_var_ptr(idle_interrupted);
+	volatile int * v = get_cpu_var_ptr(cpu,idle_interrupted);
 	*v = 0;
 	while (!*v) {
 		halt_cpu();
@@ -429,7 +430,7 @@ not_runnable_pick_new:
 	 * NMI request after exiting the while loop below, but before changing
 	 * proc_ptr, the cpu will not mistakenly use the "old" value of
 	 * proc_ptr in smp_sched_handler. */
-	get_cpu_var(cpu,proc_ptr) = get_cpulocal_var_ptr(idle_proc);
+	get_cpu_var(cpu,proc_ptr) = get_cpu_var_ptr(cpu,idle_proc);
 	unlock_proc(p);
 
 	/*
@@ -717,7 +718,8 @@ static int do_sync_ipc(struct proc * caller_ptr, /* who made the call */
 
 int do_ipc(reg_t r1, reg_t r2, reg_t r3)
 {
-  struct proc *const caller_ptr = get_cpulocal_var(proc_ptr);	/* get pointer to caller */
+  const int cpu = cpuid;
+  struct proc *const caller_ptr = get_cpu_var(cpu,proc_ptr);
   caller_ptr->p_in_ipc_op = 1;
   int call_nr = (int) r1;
   int res = 0;
@@ -725,7 +727,7 @@ int do_ipc(reg_t r1, reg_t r2, reg_t r3)
   assert(!RTS_ISSET(caller_ptr, RTS_SLOT_FREE));
 
   /* bill kernel time to this process. */
-  get_cpulocal_var(bill_ipc) = caller_ptr;
+  get_cpu_var(cpu,bill_ipc) = caller_ptr;
 
   /* If this process is subject to system call tracing, handle that first. */
   if (caller_ptr->p_misc_flags & (MF_SC_TRACE | MF_SC_DEFER)) {
@@ -1396,11 +1398,8 @@ static int mini_receive_no_lock(struct proc * caller_ptr,
   /* This is where we want our message. */
   caller_ptr->p_delivermsg_vir = (vir_bytes) m_buff_usr;
 
-  get_cpulocal_var(n_receive)++;
-
   if(src_e == ANY) {
 	  src_p = ANY;
-	  get_cpulocal_var(n_receive_any)++;
   } else
   {
 	okendpt(src_e, &src_p);
@@ -2360,12 +2359,13 @@ static struct proc * pick_proc(void)
   register struct proc *rp;			/* process to run */
   struct proc **rdy_head;
   int q;				/* iterate over queues */
+  const int cpu = cpuid;
 
   /* Check each of the scheduling queues for ready processes. The number of
    * queues is defined in proc.h, and priorities are set in the task table.
    * If there are no processes ready to run, return NULL.
    */
-  rdy_head = get_cpulocal_var(run_q_head);
+  rdy_head = get_cpu_var(cpu,run_q_head);
 retry:
   for (q=0; q < NR_SCHED_QUEUES; q++) {	
 	if(!(rp = rdy_head[q])) {
@@ -2378,7 +2378,7 @@ retry:
 		goto retry;
 	}
 	if (priv(rp)->s_flags & BILLABLE)	 	
-		get_cpulocal_var(bill_ptr) = rp; /* bill for system time */
+		get_cpu_var(cpu,bill_ptr) = rp; /* bill for system time */
 	return rp;
   }
   return NULL;
@@ -2569,14 +2569,19 @@ void sink(void)
 
 void _rts_set(struct proc *p,int flag,int lockflag)
 {
+	const int cpu = cpuid;
+
+#ifdef PROC_LOCK_CHECKS
 	if(lockflag==1)
 		assert_proc_locked_borrow(p);
 	else if(lockflag==2)
 		assert_proc_locked(p);
+#endif
+
 	p->p_rts_flags |= (flag);
 	if(!proc_is_runnable(p)&&p->p_enqueued) {
-		if(cpuid!=p->p_cpu) {
-			get_cpulocal_var(n_remote_dequeue)++;
+		if(cpu!=p->p_cpu) {
+			get_cpu_var(cpu,n_remote_dequeue)++;
 			smp_dequeue_task(p);
 		}
 		else
@@ -2588,10 +2593,14 @@ void _rts_set(struct proc *p,int flag,int lockflag)
 void _rts_unset(struct proc *p,int flag,int lockflag)
 {
 	int rts;
+
+#ifdef PROC_LOCK_CHECKS
 	if(lockflag==1)
 		assert_proc_locked_borrow(p);
 	else if(lockflag==2)
 		assert_proc_locked(p);
+#endif
+
 	rts = p->p_rts_flags;
 	p->p_rts_flags &= ~(flag);
 	if(!rts_f_is_runnable(rts) && proc_is_runnable(p)) {
@@ -2601,11 +2610,12 @@ void _rts_unset(struct proc *p,int flag,int lockflag)
 
 void _rts_setflags(struct proc *p,int flag)
 {
+	const int cpu = cpuid;
 	assert_proc_locked(p);
 	p->p_rts_flags = (flag);
 	if(proc_is_runnable(p) && (flag)) {
-		if(cpuid!=p->p_cpu) {
-			get_cpulocal_var(n_remote_dequeue)++;
+		if(cpu!=p->p_cpu) {
+			get_cpu_var(cpu,n_remote_dequeue)++;
 			smp_dequeue_task(p);
 		} else
 			dequeue(p);

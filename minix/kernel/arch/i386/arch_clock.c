@@ -230,24 +230,9 @@ void context_stop(struct proc * p)
 		kernel_ticks[cpu] = kernel_ticks[cpu] + tmp;
 		p->p_cycles = p->p_cycles + tmp;
 	} else {
-		u64_t bkl_tsc;
-		atomic_t succ;
-		
-		/* We are entering the kernel thus make sure to grab the BKL
-		 * at the end. */
-		read_tsc_64(&bkl_tsc);
-		/* this only gives a good estimate */
-		succ = big_kernel_lock.val;
-
 		/* We are leaving user space now. */
 		ktzprofile_event(KTRACE_USER_STOP);
-		
 		read_tsc_64(&tsc);
-
-		bkl_ticks[cpu] = bkl_ticks[cpu] + tsc - bkl_tsc;
-		bkl_tries[cpu]++;
-		bkl_succ[cpu] += !(!(succ == 0));
-
 		p->p_cycles = p->p_cycles + tsc - *__tsc_ctr_switch;
 	}
 #else
@@ -258,14 +243,14 @@ void context_stop(struct proc * p)
 
 	tsc_delta = tsc - *__tsc_ctr_switch;
 
-	if (get_cpulocal_var(bill_ipc)) {
-		get_cpulocal_var(bill_ipc)->p_kipc_cycles += tsc_delta;
-		get_cpulocal_var(bill_ipc) = NULL;
+	if (get_cpu_var(cpu,bill_ipc)) {
+		get_cpu_var(cpu,bill_ipc)->p_kipc_cycles += tsc_delta;
+		get_cpu_var(cpu,bill_ipc) = NULL;
 	}
 
-	if (get_cpulocal_var(bill_kcall)) {
-		get_cpulocal_var(bill_kcall)->p_kcall_cycles += tsc_delta;
-		get_cpulocal_var(bill_kcall) = NULL;
+	if (get_cpu_var(cpu,bill_kcall)) {
+		get_cpu_var(cpu,bill_kcall)->p_kcall_cycles += tsc_delta;
+		get_cpu_var(cpu,bill_kcall) = NULL;
 	}
 
 	/*

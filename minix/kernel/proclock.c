@@ -94,7 +94,6 @@ void unlock_two_procs(struct proc *p1,struct proc *p2)
 
 static void _sort3(struct proc **dest,struct proc *p1,struct proc *p2,struct proc *p3)
 {
-	assert(p1!=p2&&p2!=p3&&p3!=p1);
 	struct proc *const min12 = p1<p2?p1:p2;
 	struct proc *const min23 = p2<p3?p2:p3;
 	struct proc *const min13 = p1<p3?p1:p3;
@@ -111,7 +110,6 @@ static void _sort3(struct proc **dest,struct proc *p1,struct proc *p2,struct pro
 		dest[1] = min12;
 		dest[2] = max12;
 	} else {
-		assert(min12==min13);
 		dest[0] = p1;
 		dest[1] = min23;
 		dest[2] = max23;
@@ -197,15 +195,12 @@ retry:
 
 void _sl_unlock_proc(struct proc *p)
 {
-	assert(p);
 	/* For now we bypass the reentrant locks. */
 	spinlock_unlock(&(p->p_spinlock));
 }
 
 void _sl_lock_two_procs(struct proc *p1,struct proc *p2)
 {
-	assert(p1&&p2&&p1<p2);
-
 	/* Perform two-way test-test&set. */
 retry:
 	while(p1->p_spinlock.val&&p2->p_spinlock.val) {}
@@ -225,15 +220,12 @@ retry:
 
 void _sl_unlock_two_procs(struct proc *p1,struct proc *p2)
 {
-	assert(p1&&p2&&p1<p2);
 	proclock_impl.unlock_proc(p1);
 	proclock_impl.unlock_proc(p2);
 }
 
 void _sl_lock_three_procs(struct proc *p1,struct proc *p2,struct proc *p3)
 {
-	assert(p1&&p2&&p3&&p1<p2&&p2<p3);
-
 	/* Perform two-way test-test&set. */
 retry:
 	while(p1->p_spinlock.val&&
@@ -262,7 +254,6 @@ retry:
 
 void _sl_unlock_three_procs(struct proc *p1,struct proc *p2,struct proc *p3)
 {
-	assert(p1&&p2&&p3&&p1<p2&&p2<p3);
 	proclock_impl.unlock_proc(p1);
 	proclock_impl.unlock_proc(p2);
 	proclock_impl.unlock_proc(p3);
