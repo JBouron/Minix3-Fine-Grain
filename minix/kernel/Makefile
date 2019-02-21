@@ -10,7 +10,7 @@ MAN=
 DBG=-O0
 .endif
 
-DBG+= -g -O2
+DBG+= -g -O0
 
 .include "arch/${MACHINE_ARCH}/Makefile.inc"
 

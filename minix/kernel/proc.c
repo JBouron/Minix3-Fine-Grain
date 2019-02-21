@@ -238,35 +238,23 @@ static void idle(void)
 	context_stop(proc_addr(KERNEL));
 	ktzprofile_event(KTRACE_IDLE_START);
 
-	volatile int * v = get_cpu_var_ptr(cpu,idle_interrupted);
-	*v = 0;
-	while (!*v) {
-		halt_cpu();
-		/* Minix used to assume the following: we return from the
-		 * halt_cpu when an interrupt occured has been taken care
-		 * of (that is: BKL is held, and IF flags in EFLAGS is 0).
-		 * It turns out this is not always true, at least not in SMP
-		 * systems where it can happen that a CPU wakes up from
-		 * something that is not an NMI, nor any interrupt or INIT
-		 * signals. Which leaves us with SMI...
-		 *
-		 * In this case, we would return from halt_cpu with the
-		 * interrupt enabled and BKL not held (or at least not by
-		 * *this* cpu)!
-		 *
-		 * Thus the halt routine has been changed as follows: do not
-		 * assume anything ! Instead use the idle_interrupted cpu-
-		 * local variable to indicate that we woke up from an
-		 * interrupt. Upon returning from the halt_cpu check this
-		 * variable to know if the wake up is legitimate or not.
-		 * In case this variable is still 0 go back to the halt state,
-		 * that indicate an SMI. */
-		interrupts_disable();
-		/* The interrupt need to be disabled so that we are sure to
-		 * avoid recieving an interrupt between the check on *v and the
-		 * call to halt_cpu. */
+	/* Local wake up happens when this cpu receives an interrupt while
+	 * waiting. When this happens, the interrupt handler will call
+	 * context_stop_idle which sets `idle_interrupted` to 1.
+	 * The other way to wake up is through a fast remote wake up: a remote
+	 * cpu wakes up this cpu by writing in the `fast_wake_up` variable.
+	 */
+	volatile int *local_wake_up = get_cpu_var_ptr(cpu,idle_interrupted);
+	volatile int *remote_wake_up = get_cpu_var_ptr(cpu,fast_wake_up);
+
+	*local_wake_up = 0;
+	interrupts_enable();
+	while ((!*local_wake_up)&&(!*remote_wake_up)) {
+		/* Loop until we wake up from either way described above. */
+		arch_pause();
 	}
-	*v = 0;
+	interrupts_disable();
+	*local_wake_up = 0;
 
 	ktzprofile_event(KTRACE_IDLE_STOP);
 	/*
@@ -445,6 +433,7 @@ retry_pick:
 		/* Set the idle state while holding the queue lock to avoid
 		 * race conditions. */
 		get_cpu_var(cpu,cpu_is_idle) = 1;
+		get_cpu_var(cpu,fast_wake_up) = 0;
 		unlock_runqueues(cpu);
 		idle();
 		/* We might have scheduled some signal when waking up from the
@@ -2182,7 +2171,8 @@ void enqueue(
    * process
    */
   else if (wake_remote_cpu) {
-	  smp_schedule(rp->p_cpu);
+	  /* Signal cpu that new work is available. */
+	  get_cpu_var(rp->p_cpu,fast_wake_up) = 1;
   } else {
 	  /* In this case, the proc has been enqueued on another cpu, and this
 	   * cpu is not idle. Check if we need to tell it to preempt its
