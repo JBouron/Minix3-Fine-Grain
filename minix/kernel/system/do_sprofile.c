@@ -83,6 +83,18 @@ int do_sprofile_impl(struct proc * caller, message * m_ptr)
 				m_ptr->m_lsys_krn_sys_sprof.freq);
 			if (err)
 				return err;
+
+			/* We need to tell each cpu to start the profiling. Use
+			 * IPIs for that. */
+			const int this_cpu = cpuid;
+			for(int cpu=0;cpu<ncpus;++cpu) {
+				if(cpu==this_cpu) {
+					/* Don't send to ourselves. */
+					continue;
+				} else {
+					smp_start_profile(cpu);
+				}
+			}
 			break;
 		default:
 			printf("ERROR : unknown profiling interrupt type\n");

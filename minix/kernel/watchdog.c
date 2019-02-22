@@ -53,13 +53,13 @@ void nmi_watchdog_handler(struct nmi_frame * frame)
 {
 	smp_sched_handler();
 #if SPROFILE
-	if(watchdog_enabled) {
-		if(sprofiling) {
-			/* Gather stats and re-init the timer for the next
-			 * NMI. */
-			nmi_sprofile_handler(frame);
-			watchdog->reinit(cpuid/*UNUSED*/);
-		}
+	if(watchdog_enabled&&sprofiling) {
+		/* Gather stats and re-init the timer for the next NMI. Note 
+		 * that in case the NMI was recieved for a SCHED_IPI_PROFILE
+		 * request this sample is still taken into account, but really
+		 * that's not a big deal. */
+		nmi_sprofile_handler(frame);
+		watchdog->reinit(cpuid/*UNUSED*/);
 	}
 #else
 	if (watchdog_enabled) {
