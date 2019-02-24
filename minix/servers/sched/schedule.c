@@ -115,9 +115,9 @@ int do_noquantum(message *m_ptr)
 	}
 
 	rmp = &schedproc[proc_nr_n];
-	if (rmp->priority < MIN_USER_Q) {
-		rmp->priority += 1; /* lower priority */
-	}
+	//if (rmp->priority < MIN_USER_Q) {
+	//	rmp->priority += 1; /* lower priority */
+	//}
 
 	rv = schedule_process(rmp,SCHEDULE_CHANGE_PRIO|SCHEDULE_CHANGE_QUANTUM);
 	if (rv != OK) {
@@ -378,6 +378,7 @@ static int is_restricted_to_bsp(struct schedproc *proc)
  */
 void balance_queues(void)
 {
+	return;
 	struct schedproc *rmp;
 	int r, proc_nr;
 	nb_balance ++;
