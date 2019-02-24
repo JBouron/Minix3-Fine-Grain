@@ -634,6 +634,9 @@ static int do_sync_ipc(struct proc * caller_ptr, /* who made the call */
 		return EDEADSRCDST;
 	}
 
+#if 0
+  /* Ignore all the safety nets for now so that we can implement IPC benchmarks
+   *
 	/* If the call is to send to a process, i.e., for SEND, SENDNB,
 	 * SENDREC or NOTIFY, verify that the caller is allowed to send to
 	 * the given destination. 
@@ -650,8 +653,13 @@ static int do_sync_ipc(struct proc * caller_ptr, /* who made the call */
 			return(ECALLDENIED);	/* call denied by ipc mask */
 		}
 	}
+#endif
   }
 
+
+#if 0
+/* Ignore all the safety nets for now so that we can implement IPC benchmarks
+*/
   /* Check if the process has privileges for the requested call. Calls to the 
    * kernel may only be SENDREC, because tasks always reply and may not block 
    * if the caller doesn't do receive(). 
@@ -671,6 +679,7 @@ static int do_sync_ipc(struct proc * caller_ptr, /* who made the call */
 #endif
 	return(ETRAPDENIED);		/* trap denied by mask or kernel */
   }
+#endif
 
   switch(call_nr) {
   case SENDREC:
