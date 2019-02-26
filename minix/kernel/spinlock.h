@@ -43,7 +43,7 @@ void _reentrantlock_unlock(reentrantlock_t *rl);
 #define reetrantlock_lock(rl)
 #define reetrantlock_unlock(rl)
 #else
-int arch_spinlock_lock(atomic_t * sl);
+void arch_spinlock_lock(atomic_t * sl);
 int arch_spinlock_test(atomic_t * sl);
 void arch_spinlock_unlock(atomic_t * sl);
 int arch_fetch_and_inc(volatile atomic_t *counter);
