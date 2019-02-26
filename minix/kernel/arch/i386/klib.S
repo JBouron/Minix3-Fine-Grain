@@ -830,7 +830,6 @@ ENTRY(arch_spinlock_unlock)
 	mov	4(%esp), %eax
 	mov	$0, %ecx
 	xchg	%ecx, (%eax)
-	mfence
 	ret
 
 #endif /* CONFIG_SMP */

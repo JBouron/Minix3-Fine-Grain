@@ -257,14 +257,8 @@ void _tl_unlock_three_procs(struct proc *p1,struct proc *p2,struct proc *p3)
 /* ========================================================================= */
 static mcs_node_t *_get_mcs_node(struct proc *p)
 {
-	int idx;
-	if(p==&get_cpulocal_var(idle_proc)) {
-		idx = 0;
-	} else {
-		const ptrdiff_t addr_off = p-(&proc[0]);
-		/* +1 for the idle proc. */
-		idx = addr_off+1;
-	}
+	/* +1 because idle<n> has proc number -1 */
+	const int idx = p->p_nr+6;
 	return &(get_cpulocal_var(mcs_nodes)[idx]);
 }
 
