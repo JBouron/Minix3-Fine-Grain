@@ -179,43 +179,18 @@ void assert_proc_locked_borrow(const struct proc *p)
 /* ========================================================================= */
 void _sl_lock_proc(struct proc *p)
 {
-	assert(p);
-	int tries = 0;
-retry:
-	tries++;
-	while(p->p_spinlock.val) {}
-
-	/* Try to lock p1. */
-	if(!arch_spinlock_test(&(p->p_spinlock.val))) {
-		goto retry;
-	}
-	p->p_n_lock++;
-	p->p_n_tries += tries;
+	spinlock_lock(&(p->p_spinlock));
 }
 
 void _sl_unlock_proc(struct proc *p)
 {
-	/* For now we bypass the reentrant locks. */
 	spinlock_unlock(&(p->p_spinlock));
 }
 
 void _sl_lock_two_procs(struct proc *p1,struct proc *p2)
 {
-	/* Perform two-way test-test&set. */
-retry:
-	while(p1->p_spinlock.val&&p2->p_spinlock.val) {}
-
-	/* Try to lock p1. */
-	if(!arch_spinlock_test(&(p1->p_spinlock.val))) {
-		goto retry;
-	}
-
-	/* Try to lock p2. */
-	if(!arch_spinlock_test(&(p2->p_spinlock.val))) {
-		/* Cannot lock p2, don't hold p1 and return to the test loop. */
-		_sl_unlock_proc(p1);
-		goto retry;
-	}
+	_sl_lock_proc(p1);
+	_sl_lock_proc(p2);
 }
 
 void _sl_unlock_two_procs(struct proc *p1,struct proc *p2)
@@ -226,30 +201,9 @@ void _sl_unlock_two_procs(struct proc *p1,struct proc *p2)
 
 void _sl_lock_three_procs(struct proc *p1,struct proc *p2,struct proc *p3)
 {
-	/* Perform two-way test-test&set. */
-retry:
-	while(p1->p_spinlock.val&&
-	      p2->p_spinlock.val&&
-	      p3->p_spinlock.val) {}
-
-	/* Try to lock p1. */
-	if(!arch_spinlock_test(&(p1->p_spinlock.val))) {
-		goto retry;
-	}
-
-	/* Try to lock p2. */
-	if(!arch_spinlock_test(&(p2->p_spinlock.val))) {
-		/* Cannot lock p2, don't hold p1 and return to the test loop. */
-		_sl_unlock_proc(p1);
-		goto retry;
-	}
-
-	/* Try to lock p3. */
-	if(!arch_spinlock_test(&(p3->p_spinlock.val))) {
-		/* Cannot lock p2, don't hold p1 and return to the test loop. */
-		_sl_unlock_two_procs(p1,p2);
-		goto retry;
-	}
+	_sl_lock_proc(p1);
+	_sl_lock_proc(p2);
+	_sl_lock_proc(p3);
 }
 
 void _sl_unlock_three_procs(struct proc *p1,struct proc *p2,struct proc *p3)
