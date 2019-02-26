@@ -808,7 +808,6 @@ ENTRY(arch_spinlock_lock)
 	jz	2b
 	jmp	3b
 0:
-	mfence
 	mov	%ebx, %eax
 	pop %ebx
 	ret
@@ -824,7 +823,6 @@ ENTRY(arch_spinlock_test)
 	ret
 
 0:
-	mfence
 	mov	$1, %eax
 	ret
 

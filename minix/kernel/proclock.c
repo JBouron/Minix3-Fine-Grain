@@ -213,15 +213,15 @@ retry:
 	/* Try to lock p2. */
 	if(!arch_spinlock_test(&(p2->p_spinlock.val))) {
 		/* Cannot lock p2, don't hold p1 and return to the test loop. */
-		proclock_impl.unlock_proc(p1);
+		_sl_unlock_proc(p1);
 		goto retry;
 	}
 }
 
 void _sl_unlock_two_procs(struct proc *p1,struct proc *p2)
 {
-	proclock_impl.unlock_proc(p1);
-	proclock_impl.unlock_proc(p2);
+	_sl_unlock_proc(p1);
+	_sl_unlock_proc(p2);
 }
 
 void _sl_lock_three_procs(struct proc *p1,struct proc *p2,struct proc *p3)
@@ -240,23 +240,23 @@ retry:
 	/* Try to lock p2. */
 	if(!arch_spinlock_test(&(p2->p_spinlock.val))) {
 		/* Cannot lock p2, don't hold p1 and return to the test loop. */
-		proclock_impl.unlock_proc(p1);
+		_sl_unlock_proc(p1);
 		goto retry;
 	}
 
 	/* Try to lock p3. */
 	if(!arch_spinlock_test(&(p3->p_spinlock.val))) {
 		/* Cannot lock p2, don't hold p1 and return to the test loop. */
-		proclock_impl.unlock_two_procs(p1,p2);
+		_sl_unlock_two_procs(p1,p2);
 		goto retry;
 	}
 }
 
 void _sl_unlock_three_procs(struct proc *p1,struct proc *p2,struct proc *p3)
 {
-	proclock_impl.unlock_proc(p1);
-	proclock_impl.unlock_proc(p2);
-	proclock_impl.unlock_proc(p3);
+	_sl_unlock_proc(p1);
+	_sl_unlock_proc(p2);
+	_sl_unlock_proc(p3);
 }
 
 /* ========================================================================= */
