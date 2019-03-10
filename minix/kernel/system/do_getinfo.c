@@ -206,6 +206,22 @@ int do_getinfo(struct proc * caller, message * m_ptr)
 	src_vir = (vir_bytes)ticks;
 	break;
     }
+    case GET_KC_COUNT: {
+	unsigned int cpu; 
+	cpu = (unsigned int)m_ptr->m_lsys_krn_sys_getinfo.val_len2_e;
+	int kernel_calls = get_cpu_var(cpu,n_kernel_calls);
+	length = sizeof(kernel_calls);
+	src_vir = (vir_bytes)(&kernel_calls);
+	break;
+    }
+    case GET_KC_NONOPTI_COUNT: {
+	unsigned int cpu; 
+	cpu = (unsigned int)m_ptr->m_lsys_krn_sys_getinfo.val_len2_e;
+	int kernel_calls_no = get_cpu_var(cpu,n_kernel_calls_non_opti);
+	length = sizeof(kernel_calls_no);
+	src_vir = (vir_bytes)(&kernel_calls_no);
+	break;
+    }
     default:
 	printf("do_getinfo: invalid request %d\n",
 		m_ptr->m_lsys_krn_sys_getinfo.request);

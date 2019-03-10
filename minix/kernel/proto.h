@@ -72,6 +72,7 @@ void vm_suspend(struct proc *caller, const struct proc *target,
 void enqueue(struct proc *rp);
 void dequeue(struct proc *rp);
 void switch_to_user(void);
+void switch_to_user_curr_locked(void);
 void arch_proc_reset(struct proc *rp);
 void arch_proc_setcontext(struct proc *rp, struct stackframe_s *state,
 	int user, int restorestyle);

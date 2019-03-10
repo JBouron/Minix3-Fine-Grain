@@ -153,7 +153,7 @@ fail:
 int do_umap_remote(struct proc * caller, message * m_ptr)
 {
 	const int res = do_umap_remote_impl(caller,m_ptr);
-	assert(proc_locked(caller));
+	assert_proc_locked(caller);
 	return res;
 }
 

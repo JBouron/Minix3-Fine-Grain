@@ -12,7 +12,11 @@
 
 #include <string.h>
 #include "watchdog.h"
+#include "spinlock.h"
 
+/* The lock for the profiling data. */
+spinlock_t sprof_lock;
+/* The sample buffer is protected by the lock in the sprof_info_s struct. */
 char sprof_sample_buffer[SAMPLE_BUFFER_SIZE];
 
 /* Function prototype for the profiling clock handler. */ 
@@ -76,16 +80,22 @@ static void profile_sample(struct proc * p, void * pc)
 {
 /* This executes on every tick of the CMOS timer. */
 
+#ifdef CONFIG_SMP
+  /* In SMP system we are running the profiler on all cores, thus acquire the
+   * lock before adding any sample. */
+  spinlock_lock(&(sprof_lock));
+#endif
+
   /* Are we profiling, and profiling memory not full? */
   if (!sprofiling || sprof_info.mem_used == -1)
-	  return;
+	  goto out;
 
   /* Check if enough memory available before writing sample. */
   if (sprof_info.mem_used + sizeof(sprof_info) +
 		  2*sizeof(struct sprof_sample) +
 		  2*sizeof(struct sprof_sample) > sprof_mem_size) {
 	sprof_info.mem_used = -1;
-	return;
+	goto out;
   }
 
   /* Runnable system process? */
@@ -107,6 +117,11 @@ static void profile_sample(struct proc * p, void * pc)
   }
   
   sprof_info.total_samples++;
+out:
+#ifdef CONFIG_SMP
+  /* Unlock the profiling data. */
+  spinlock_unlock(&(sprof_lock));
+#endif
 }
 
 /*===========================================================================*

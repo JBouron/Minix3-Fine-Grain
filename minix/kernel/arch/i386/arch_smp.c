@@ -53,29 +53,21 @@ void unlock_all_procs_except(int except_proc_nr)
 
 void _reentrantlock_lock(reentrantlock_t *rl)
 {
-	int cpu = cpuid;
-	if(rl->owner-1!=cpu) {
-		spinlock_lock(&(rl->lock));
-		rl->owner = cpu+1;
-		assert(rl->n_locks==0);
-		rl->n_locks = 1;
-	} else {
-		/* We already hold this lock, simply update n_locks. */
-		rl->n_locks++;
+	const int this_owner = cpuid+1;
+	if(rl->owner!=this_owner) {
+		ticketlock_lock(&(rl->lock));
+		rl->owner = this_owner;
 	}
-	assert(rl->owner>0);
+	rl->n_locks++;
 }
 
 void _reentrantlock_unlock(reentrantlock_t *rl)
 {
-	int cpu = cpuid;
-	assert(rl->owner-1==cpu);
 	rl->n_locks--;
-
 	/* Reset the owner if we don't hold this lock anymore. */
 	if(!rl->n_locks) {
 		rl->owner = 0;
-		spinlock_unlock(&(rl->lock));
+		ticketlock_unlock(&(rl->lock));
 	}
 }
 
@@ -274,6 +266,9 @@ static void ap_finish_booting(void)
 	/* inform the world of our presence. */
 	ap_cpu_ready = cpu;
 
+	/* Set up sysenter. */
+	setup_sysenter_syscall();
+
 	/*
 	 * Finish processor initialisation.  CPUs must be excluded from running.
 	 * lapic timer calibration locks and unlocks the BKL because of the
@@ -355,6 +350,7 @@ void smp_init (void)
 	ioapic_enabled = 0;
 
 	tss_init_all();
+	setup_sysenter_syscall();
 
 	/* 
 	 * we still run on the boot stack and we cannot use cpuid as its value

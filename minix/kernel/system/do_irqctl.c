@@ -181,6 +181,8 @@ static int generic_handler(irq_hook_t * hook)
   /* Call the lock version since we don't have the BKL anymore when handling
    * irqs. */
   mini_notify(proc_addr(HARDWARE), hook->proc_nr_e);
+  /* mini_notify does not unlock the caller. */
+  unlock_proc(proc_addr(HARDWARE));
   return(hook->policy & IRQ_REENABLE);
 }
 

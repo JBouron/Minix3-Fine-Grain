@@ -36,6 +36,9 @@ struct proc {
   int p_enqueued;		/* Is the lock enqueued on it's cpu ? */
   int p_deliver_type;		/* What kind of message has been delivered ? */
   int p_new_message;		/* Has the process received a new message ? */
+  int p_pending_notif;		/* Is there a pending notification ? */
+  int p_pending_async;		/* Is there a pending async ? */
+  int p_pending_caller_q;	/* Is there a pending message in caller_q ? */
   int p_in_ipc_op;		/* Is this process running IPC code in kernel ? */
   int p_next_cpu;		/* To schedule migrations. */
   int p_n_lock;			/* # of times this proc has been locked. */
@@ -382,8 +385,11 @@ void lock_two_procs(struct proc *p1,struct proc *p2);
 void unlock_two_procs(struct proc *p1,struct proc *p2);
 void lock_three_procs(struct proc *p1,struct proc *p2,struct proc *p3);
 void unlock_three_procs(struct proc *p1,struct proc *p2,struct proc *p3);
-int proc_locked(const struct proc *p);
-int proc_locked_borrow(const struct proc *p);
+
+/* Assert that the process p is locked by the current cpu and a remote cpu
+ * respectively. */
+void assert_proc_locked(const struct proc *p);
+void assert_proc_locked_borrow(const struct proc *p);
 
 
 #endif /* __ASSEMBLY__ */

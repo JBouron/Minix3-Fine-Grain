@@ -213,15 +213,16 @@ static void idle(void)
 	 * the CPU utilization of certain workloads with high precision.
 	 */
 
-	p = get_cpulocal_var(proc_ptr) = get_cpulocal_var_ptr(idle_proc);
+	const int cpu = cpuid;
+	p = get_cpu_var(cpu,proc_ptr) = get_cpu_var_ptr(cpu,idle_proc);
 	if (priv(p)->s_flags & BILLABLE)
-		get_cpulocal_var(bill_ptr) = p;
+		get_cpu_var(cpu,bill_ptr) = p;
 
 	switch_address_space_idle();
 
 #ifdef CONFIG_SMP
 	/* we don't need to keep time on APs as it is handled on the BSP */
-	if (cpuid != bsp_cpu_id)
+	if (cpu != bsp_cpu_id)
 		stop_local_timer();
 	else
 #endif
@@ -237,35 +238,23 @@ static void idle(void)
 	context_stop(proc_addr(KERNEL));
 	ktzprofile_event(KTRACE_IDLE_START);
 
-	volatile int * v = get_cpulocal_var_ptr(idle_interrupted);
-	*v = 0;
-	while (!*v) {
-		halt_cpu();
-		/* Minix used to assume the following: we return from the
-		 * halt_cpu when an interrupt occured has been taken care
-		 * of (that is: BKL is held, and IF flags in EFLAGS is 0).
-		 * It turns out this is not always true, at least not in SMP
-		 * systems where it can happen that a CPU wakes up from
-		 * something that is not an NMI, nor any interrupt or INIT
-		 * signals. Which leaves us with SMI...
-		 *
-		 * In this case, we would return from halt_cpu with the
-		 * interrupt enabled and BKL not held (or at least not by
-		 * *this* cpu)!
-		 *
-		 * Thus the halt routine has been changed as follows: do not
-		 * assume anything ! Instead use the idle_interrupted cpu-
-		 * local variable to indicate that we woke up from an
-		 * interrupt. Upon returning from the halt_cpu check this
-		 * variable to know if the wake up is legitimate or not.
-		 * In case this variable is still 0 go back to the halt state,
-		 * that indicate an SMI. */
-		interrupts_disable();
-		/* The interrupt need to be disabled so that we are sure to
-		 * avoid recieving an interrupt between the check on *v and the
-		 * call to halt_cpu. */
+	/* Local wake up happens when this cpu receives an interrupt while
+	 * waiting. When this happens, the interrupt handler will call
+	 * context_stop_idle which sets `idle_interrupted` to 1.
+	 * The other way to wake up is through a fast remote wake up: a remote
+	 * cpu wakes up this cpu by writing in the `fast_wake_up` variable.
+	 */
+	volatile int *local_wake_up = get_cpu_var_ptr(cpu,idle_interrupted);
+	volatile int *remote_wake_up = get_cpu_var_ptr(cpu,fast_wake_up);
+
+	*local_wake_up = 0;
+	interrupts_enable();
+	while ((!*local_wake_up)&&(!*remote_wake_up)) {
+		/* Loop until we wake up from either way described above. */
+		arch_pause();
 	}
-	*v = 0;
+	interrupts_disable();
+	*local_wake_up = 0;
 
 	ktzprofile_event(KTRACE_IDLE_STOP);
 	/*
@@ -284,8 +273,8 @@ void vm_suspend(struct proc *caller, const struct proc *target,
         /* This range is not OK for this process. Set parameters
          * of the request and notify VM about the pending request.
          */
-	assert(proc_locked(caller));
-	assert(proc_locked(target));
+	assert_proc_locked(caller);
+	assert_proc_locked(target);
         assert(!RTS_ISSET(caller, RTS_VMREQUEST));
         assert(!RTS_ISSET(target, RTS_VMREQUEST));
 
@@ -347,7 +336,13 @@ static void delivermsg(struct proc *rp)
 /*===========================================================================*
  *				switch_to_user				     * 
  *===========================================================================*/
-void switch_to_user(void)
+/**
+ * This is the implementation of switch_to_user.
+ * The curr_locked parameter specifies if proc_ptr of the current cpu is
+ * already lock by the current cpu. This is the case if we come from a kernel
+ * call or an IPC.
+ */
+static void _switch_to_user(const int curr_locked)
 {
 	/* This function is called an instant before proc_ptr is
 	 * to be scheduled again.
@@ -358,11 +353,12 @@ void switch_to_user(void)
 	const int cpu = cpuid;
 #endif
 
-	/* Send all the signals from the kernel operation we just performed. */
-	handle_all_deferred_sigs();
-
 	p = get_cpu_var(cpu,proc_ptr);
-	lock_proc(p);
+
+	if(!curr_locked)
+		lock_proc(p);
+	else
+		assert_proc_locked(p);
 
 	/* Handle the preemption here. We need to do this before the next if
 	 * (proc_is_runnable) because most of the time the preempted proc is
@@ -399,7 +395,7 @@ not_runnable_pick_new:
 		lock_proc(p);
 	}
 
-	assert(proc_locked(p));
+	assert_proc_locked(p);
 	if (proc_is_migrating(p)) {
 		/* Somebody wants to migrate this process. now that its
 		 * time-slice or kernel operation is over we can migrate it. */
@@ -422,7 +418,7 @@ not_runnable_pick_new:
 	 * NMI request after exiting the while loop below, but before changing
 	 * proc_ptr, the cpu will not mistakenly use the "old" value of
 	 * proc_ptr in smp_sched_handler. */
-	get_cpu_var(cpu,proc_ptr) = get_cpulocal_var_ptr(idle_proc);
+	get_cpu_var(cpu,proc_ptr) = get_cpu_var_ptr(cpu,idle_proc);
 	unlock_proc(p);
 
 	/*
@@ -437,6 +433,7 @@ retry_pick:
 		/* Set the idle state while holding the queue lock to avoid
 		 * race conditions. */
 		get_cpu_var(cpu,cpu_is_idle) = 1;
+		get_cpu_var(cpu,fast_wake_up) = 0;
 		unlock_runqueues(cpu);
 		idle();
 		/* We might have scheduled some signal when waking up from the
@@ -485,7 +482,8 @@ check_misc_flags:
 		assert(proc_is_runnable(p));
 		if (p->p_misc_flags & MF_KCALL_RESUME) {
 			kernel_call_resume(p);
-			lock_proc(p);
+			/* p has been locked by the kernel call so it is still
+			 * locked here. */
 		}
 		else if (p->p_misc_flags & MF_DELIVERMSG) {
 			TRACE(VF_SCHEDULING, printf("delivering to %s / %d\n",
@@ -565,13 +563,31 @@ check_misc_flags:
 
 	/* Check that we did not forget to send a signal. */
 	assert(get_cpu_var(cpu,sigbuffer_count)==0);
-	
+
 	/*
 	 * restore_user_context() carries out the actual mode switch from kernel
 	 * to userspace. This function does not return
 	 */
 	restore_user_context(p);
 	NOT_REACHABLE;
+}
+
+void switch_to_user(void) 
+{
+	/* This is the version called by interrupts and exceptions handlers.
+	 * Thus the current proc is not locked at this point.
+	 */
+	const int curr_locked = 0;
+	_switch_to_user(curr_locked);
+}
+
+void switch_to_user_curr_locked(void) 
+{
+	/* This is the version called by kernel call handler.
+	 * Thus the current proc _is_ locked at this point.
+	 */
+	const int curr_locked = 1;
+	_switch_to_user(curr_locked);
 }
 
 /*
@@ -618,6 +634,9 @@ static int do_sync_ipc(struct proc * caller_ptr, /* who made the call */
 		return EDEADSRCDST;
 	}
 
+#if 0
+  /* Ignore all the safety nets for now so that we can implement IPC benchmarks
+   *
 	/* If the call is to send to a process, i.e., for SEND, SENDNB,
 	 * SENDREC or NOTIFY, verify that the caller is allowed to send to
 	 * the given destination. 
@@ -634,8 +653,13 @@ static int do_sync_ipc(struct proc * caller_ptr, /* who made the call */
 			return(ECALLDENIED);	/* call denied by ipc mask */
 		}
 	}
+#endif
   }
 
+
+#if 0
+/* Ignore all the safety nets for now so that we can implement IPC benchmarks
+*/
   /* Check if the process has privileges for the requested call. Calls to the 
    * kernel may only be SENDREC, because tasks always reply and may not block 
    * if the caller doesn't do receive(). 
@@ -655,6 +679,7 @@ static int do_sync_ipc(struct proc * caller_ptr, /* who made the call */
 #endif
 	return(ETRAPDENIED);		/* trap denied by mask or kernel */
   }
+#endif
 
   switch(call_nr) {
   case SENDREC:
@@ -691,7 +716,8 @@ static int do_sync_ipc(struct proc * caller_ptr, /* who made the call */
 
 int do_ipc(reg_t r1, reg_t r2, reg_t r3)
 {
-  struct proc *const caller_ptr = get_cpulocal_var(proc_ptr);	/* get pointer to caller */
+  const int cpu = cpuid;
+  struct proc *const caller_ptr = get_cpu_var(cpu,proc_ptr);
   caller_ptr->p_in_ipc_op = 1;
   int call_nr = (int) r1;
   int res = 0;
@@ -699,7 +725,7 @@ int do_ipc(reg_t r1, reg_t r2, reg_t r3)
   assert(!RTS_ISSET(caller_ptr, RTS_SLOT_FREE));
 
   /* bill kernel time to this process. */
-  get_cpulocal_var(bill_ipc) = caller_ptr;
+  get_cpu_var(cpu,bill_ipc) = caller_ptr;
 
   /* If this process is subject to system call tracing, handle that first. */
   if (caller_ptr->p_misc_flags & (MF_SC_TRACE | MF_SC_DEFER)) {
@@ -750,9 +776,12 @@ int do_ipc(reg_t r1, reg_t r2, reg_t r3)
   	    /* Limit size to something reasonable. An arbitrary choice is 16
   	     * times the number of process table entries.
   	     */
-  	    if (msg_size > 16*(NR_TASKS + NR_PROCS))
+  	    if (msg_size > 16*(NR_TASKS + NR_PROCS)) {
 			res = EDOM;
-	    else
+			/* When entering switch_to_user after an IPC we expect 
+			 * the caller to be locked. */
+			lock_proc(caller_ptr);
+	    } else
 		    res = mini_senda(caller_ptr, amsg, msg_size);
 	    goto end;
   	}
@@ -765,6 +794,9 @@ int do_ipc(reg_t r1, reg_t r2, reg_t r3)
 			arch_set_secondary_ipc_return(caller_ptr, minix_kerninfo_user);
 			res = OK;
 		}
+		/* When entering switch_to_user after an IPC we expect the
+		 * caller to be locked. */
+		lock_proc(caller_ptr);
 		goto end;
 	}
   	default:
@@ -968,8 +1000,8 @@ int mini_send_no_lock(
   dst_p = _ENDPOINT_P(dst_e);
   dst_ptr = proc_addr(dst_p);
 
-  assert(proc_locked(caller_ptr));
-  assert(proc_locked(dst_ptr));
+  assert_proc_locked(caller_ptr);
+  assert_proc_locked(dst_ptr);
 
   if (RTS_ISSET(dst_ptr, RTS_NO_ENDPOINT))
   {
@@ -986,8 +1018,6 @@ int mini_send_no_lock(
 
 	if (!(flags & FROM_KERNEL)) {
 		if(copy_msg_from_user(m_ptr, &dst_ptr->p_delivermsg))
-			return EFAULT;
-		if(copy_msg_from_user(m_ptr, &caller_ptr->p_sendmsg))
 			return EFAULT;
 	} else {
 		dst_ptr->p_delivermsg = *m_ptr;
@@ -1045,6 +1075,7 @@ int mini_send_no_lock(
 	xpp = &dst_ptr->p_caller_q;		/* find end of list */
 	while (*xpp) xpp = &(*xpp)->p_q_link;	
 	*xpp = caller_ptr;			/* add caller to end */
+	dst_ptr->p_pending_caller_q ++;
 
 #if DEBUG_IPC_HOOK
 	hook_ipc_msgsend(&caller_ptr->p_sendmsg, caller_ptr, dst_ptr);
@@ -1070,7 +1101,9 @@ int mini_send(
 
 	lock_two_procs(caller_ptr,dst_ptr);
 	res = mini_send_no_lock(caller_ptr,dst_e,m_ptr,flags);
-	unlock_two_procs(caller_ptr,dst_ptr);
+	unlock_proc(dst_ptr);
+	/* We keep the lock on `caller`, it will be unlocked in switch_to_user.
+	 * Doing so we avoid unnecessary unlock-locks which add up. */
 
 	return res;
 }
@@ -1083,7 +1116,7 @@ static int mini_sendrec_no_lock(struct proc *caller_ptr, struct proc *to,
 {
 	int other_p,result;
 	const int src = to->p_endpoint;
-	assert(proc_locked(caller_ptr));
+	assert_proc_locked(caller_ptr);
 	/* A flag is set so that notifications cannot interrupt SENDREC. */
 	caller_ptr->p_misc_flags |= MF_REPLY_PEND;
 	result = mini_send_no_lock(caller_ptr, src, m_buff_usr, 0);
@@ -1108,12 +1141,8 @@ static int mini_sendrec(struct proc *caller_ptr, endpoint_t src,
 	 * receive is not ANY. */
 
 	lock_two_procs(caller_ptr,other_ptr);
-	res = mini_sendrec_no_lock(caller_ptr,other_ptr,m_buff_usr,flags);
-
-	/* other_ptr has been unlocked in mini_sendrec_no_lock. */
-	unlock_proc(caller_ptr);
-
-	return res;
+	return mini_sendrec_no_lock(caller_ptr,other_ptr,m_buff_usr,flags);
+	/* other_ptr is unlocked by mini_sendrec_no_lock. */
 }
 
 /*===========================================================================*
@@ -1136,7 +1165,7 @@ static int set_waiting_receiving(struct proc *caller_ptr, endpoint_t src_e, int 
   }
 }
 
-static int check_pending_notif(struct proc *caller_ptr,int src_e,int src_p)
+static int _check_pending_notif(struct proc *caller_ptr,int src_e,int src_p)
 {
 	/* Check for pending notifications */
 	const int src_id = has_pending_notify(caller_ptr, src_p);
@@ -1174,7 +1203,18 @@ static int check_pending_notif(struct proc *caller_ptr,int src_e,int src_p)
 	return 0; // Failure
 }
 
-static int check_pending_async(struct proc *caller_ptr,int src_e,int src_p)
+static int check_pending_notif(struct proc *caller_ptr,int src_e,int src_p)
+{
+	if (!(caller_ptr->p_misc_flags & MF_REPLY_PEND)) {
+		/* We don't need any other lock for notifs. */
+		if(_check_pending_notif(caller_ptr,src_e,src_p)) {
+			return 1;
+		}
+	}
+	return 0;
+}
+
+static int _check_pending_async(struct proc *caller_ptr,int src_e,int src_p)
 {
 	/* Check for pending asynchronous messages */
 	int r;
@@ -1194,6 +1234,24 @@ static int check_pending_async(struct proc *caller_ptr,int src_e,int src_p)
 	return 0;
 }
 
+static int check_pending_async(struct proc *caller_ptr,int src_e,int src_p)
+{
+	struct proc *src_ptr;
+	if(src_p!=ANY) {
+		/* In case of non-ANY source we can already acquire the locks. */
+		src_ptr = proc_addr(src_p);
+		lock_two_procs(caller_ptr,src_ptr);
+	}
+	int r = _check_pending_async(caller_ptr,src_e,src_p);
+	if(src_p!=ANY) {
+		unlock_two_procs(caller_ptr,src_ptr);
+	}
+	if(r) {
+		return 1;
+	}
+	return 0;
+}
+
 static int check_caller_queue(struct proc *caller_ptr,int src_e)
 {
 	int result = 0;
@@ -1208,8 +1266,8 @@ static int check_caller_queue(struct proc *caller_ptr,int src_e)
 		if(src_ptr->p_sendto_e==caller_ptr->p_endpoint) {
 			/* The source is indeed in the caller chain. */
 			assert(CANRECEIVE(src_e, src_e, caller_ptr, 0, &src_ptr->p_sendmsg));
-			assert(proc_locked(src_ptr));
-			assert(proc_locked(caller_ptr));
+			assert_proc_locked(src_ptr);
+			assert_proc_locked(caller_ptr);
 			assert(!RTS_ISSET(src_ptr, RTS_SLOT_FREE));
 			assert(!RTS_ISSET(src_ptr, RTS_NO_ENDPOINT));
 
@@ -1269,8 +1327,8 @@ static int check_caller_queue(struct proc *caller_ptr,int src_e)
 		// not occur that often (or never).
 		assert(caller_ptr->p_caller_q==first);
 		assert(CANRECEIVE(src_e, first_e, caller_ptr, 0, &first->p_sendmsg));
-		assert(proc_locked(first));
-		assert(proc_locked(caller_ptr));
+		assert_proc_locked(first);
+		assert_proc_locked(caller_ptr);
 		assert(!RTS_ISSET(first, RTS_SLOT_FREE));
 		assert(!RTS_ISSET(first, RTS_NO_ENDPOINT));
 
@@ -1331,19 +1389,15 @@ static int mini_receive_no_lock(struct proc * caller_ptr,
   const int is_non_blocking = flags&NON_BLOCKING;
   int tries = 0;
 
-retry:
   tries ++;
-  assert(proc_locked(caller_ptr));
+  assert_proc_locked(caller_ptr);
   assert(!(caller_ptr->p_misc_flags & MF_DELIVERMSG));
 
   /* This is where we want our message. */
   caller_ptr->p_delivermsg_vir = (vir_bytes) m_buff_usr;
 
-  get_cpulocal_var(n_receive)++;
-
   if(src_e == ANY) {
 	  src_p = ANY;
-	  get_cpulocal_var(n_receive_any)++;
   } else
   {
 	okendpt(src_e, &src_p);
@@ -1361,52 +1415,45 @@ retry:
 	  return set_waiting_receiving(caller_ptr,src_e,is_non_blocking);
   }
 
-  /* Check if there are pending notifications, except for SENDREC. */
-  if (! (caller_ptr->p_misc_flags & MF_REPLY_PEND)) {
-	  /* We don't need any other lock for notifs. */
-	  if(check_pending_notif(caller_ptr,src_e,src_p)) {
-		  receive_done(caller_ptr);
-		  return OK;
+
+  do {
+	  if(caller_ptr->p_pending_notif) {
+		  if(check_pending_notif(caller_ptr,src_e,src_p)) {
+			  caller_ptr->p_pending_notif--;
+			  receive_done(caller_ptr);
+			  return OK;
+		  }
 	  }
-  }
 
-  /* Checking the async messages and the caller queue will need other locks.
-   * Which means we will have to release caller_ptr at some point.
-   * By doing so another proc may send us a message in the mean time, look at
-   * p_new_message to check if it happened. */
-  caller_ptr->p_new_message = 0;
-  unlock_proc(caller_ptr);
+	  caller_ptr->p_new_message = 0;
 
-  if(src_p!=ANY) {
-	  /* In case of non-ANY source we can already acquire the locks. */
-	  src_ptr = proc_addr(src_p);
-	  lock_two_procs(caller_ptr,src_ptr);
-  }
-  r = check_pending_async(caller_ptr,src_e,src_p);
-  if(src_p!=ANY) {
-	  unlock_two_procs(caller_ptr,src_ptr);
-  }
-  if(r) {
-	  /* We found an async message, deliver it. */
-	  lock_proc(caller_ptr); // The caller expects it.
-	  receive_done(caller_ptr);
-	  return OK;
-  }
+	  if(caller_ptr->p_pending_async) {
+		  unlock_proc(caller_ptr);
+		  const int res = check_pending_async(caller_ptr,src_e,src_p);
+		  lock_proc(caller_ptr);
+		  if(res) {
+			  caller_ptr->p_pending_async--;
+			  receive_done(caller_ptr);
+			  return OK;
+		  }
+	  }
 
-  /* Finally check the caller queue. */
-  if(check_caller_queue(caller_ptr,src_e)) {
-	  lock_proc(caller_ptr); // The caller expects it.
-	  receive_done(caller_ptr);
-	  return OK;
-  }
+	  if(caller_ptr->p_pending_caller_q) {
+		  unlock_proc(caller_ptr);
+		  const int res = check_caller_queue(caller_ptr,src_e);
+		  lock_proc(caller_ptr);
+		  if(res) {
+			  caller_ptr->p_pending_caller_q--;
+			  receive_done(caller_ptr);
+			  return OK;
+		  }
+	  }
+  } while(caller_ptr->p_new_message);
+  assert_proc_locked(caller_ptr);
 
-  /* Nothing worked, check if nobody sent a message in the meantime. If not
-   * then we can safely block. */
-  lock_proc(caller_ptr);
-  if(caller_ptr->p_new_message)
-	  goto retry;
-  else
-	  return set_waiting_receiving(caller_ptr,src_e,is_non_blocking);
+  /* If we reach this point then it means we couldn't deliver any message. Thus
+   * we need to block the caller. */
+  return set_waiting_receiving(caller_ptr,src_e,is_non_blocking);
 }
 
 /*
@@ -1469,9 +1516,7 @@ static int mini_receive(struct proc * caller_ptr,
 			const int flags)
 {
 	lock_proc(caller_ptr);
-	const int res = mini_receive_no_lock(caller_ptr,src_e,m_buff_usr,flags);
-	unlock_proc(caller_ptr);
-	return res;
+	return mini_receive_no_lock(caller_ptr,src_e,m_buff_usr,flags);
 }
 
 /*===========================================================================*
@@ -1495,7 +1540,7 @@ int mini_notify_no_lock(
   dst_ptr = proc_addr(dst_p);
   dst_ptr->p_new_message = 1;
 
-  assert(proc_locked(dst_ptr));
+  assert_proc_locked(dst_ptr);
 
   /* Check to see if target is blocked waiting for this message. A process 
    * can be both sending and receiving during a SENDREC system call.
@@ -1527,6 +1572,7 @@ int mini_notify_no_lock(
    */ 
   src_id = priv(caller_ptr)->s_id;
   set_sys_bit(priv(dst_ptr)->s_notify_pending, src_id); 
+  dst_ptr->p_pending_notif ++;
   return(OK);
 }
 
@@ -1546,7 +1592,9 @@ int mini_notify(
 
 	lock_two_procs(caller_ptr,dst_ptr);
 	res = mini_notify_no_lock(caller_ptr,dst_e);
-	unlock_two_procs(caller_ptr,dst_ptr);
+	unlock_proc(dst_ptr);
+	/* We keep the lock on `caller`, it will be unlocked in switch_to_user.
+	 * Doing so we avoid unnecessary unlock-locks which add up. */
 
 	return res;
 }
@@ -1597,7 +1645,7 @@ int try_deliver_senda(struct proc *caller_ptr,
   const vir_bytes table_v = (vir_bytes) table;
   message *m_ptr = NULL;
 
-  assert(proc_locked(caller_ptr));
+  assert_proc_locked(caller_ptr);
 
   privp = priv(caller_ptr);
 
@@ -1623,7 +1671,7 @@ int try_deliver_senda(struct proc *caller_ptr,
   for (i = 0; i < size; i++) {
 	/* Process each entry in the table and store the result in the table.
 	 * If we're done handling a message, copy the result to the sender. */
-	assert(proc_locked(caller_ptr));
+	assert_proc_locked(caller_ptr);
 
 	dst = NONE;
 	/* Copy message to kernel */
@@ -1696,7 +1744,7 @@ retry:
 	if (r == OK && RTS_ISSET(dst_ptr, RTS_NO_ENDPOINT)) {
 		r = EDEADSRCDST;
 	}
-	assert(proc_locked(dst_ptr));
+	assert_proc_locked(dst_ptr);
 
 	/* Check if 'dst' is blocked waiting for this message.
 	 * If AMF_NOREPLY is set, do not satisfy the receiving part of
@@ -1726,6 +1774,7 @@ retry:
 		/* Inform receiver that something is pending */
 		set_sys_bit(priv(dst_ptr)->s_asyn_pending, 
 			    priv(caller_ptr)->s_id); 
+		dst_ptr->p_pending_async ++;
 		done = FALSE;
 		/* Keep the lock on caller_ptr for the end of ite (+ the next
 		 * one). */
@@ -1750,7 +1799,7 @@ asyn_error:
 	else
 		printf("KERNEL senda error %d\n", r);
   }
-  assert(proc_locked(caller_ptr));
+  assert_proc_locked(caller_ptr);
 
   if (do_notify) 
 	mini_notify_no_lock(proc_addr(ASYNCM), caller_ptr->p_endpoint);
@@ -1787,10 +1836,7 @@ static int mini_senda(struct proc *caller_ptr, asynmsg_t *table, size_t size)
 	int res;
 
 	lock_proc(caller_ptr);
-	res = mini_senda_no_lock(caller_ptr,table,size);
-	unlock_proc(caller_ptr);
-
-	return res;
+	return mini_senda_no_lock(caller_ptr,table,size);
 }
 
 
@@ -1855,8 +1901,8 @@ static int try_one(endpoint_t receive_e, struct proc *src_ptr,
   asynmsg_t tabent;
   vir_bytes table_v;
 
-  assert(proc_locked(src_ptr));
-  assert(proc_locked(dst_ptr));
+  assert_proc_locked(src_ptr);
+  assert_proc_locked(dst_ptr);
 
   privp = priv(src_ptr);
   if (!(privp->s_flags & SYS_PROC)) return(EPERM);
@@ -1957,7 +2003,7 @@ store_result:
 	privp->s_asyntab = -1;
 	privp->s_asynsize = 0;
   } else {
-	assert(proc_locked(dst_ptr));
+	assert_proc_locked(dst_ptr);
 	set_sys_bit(priv(dst_ptr)->s_asyn_pending, privp->s_id);
   }
 
@@ -1981,8 +2027,8 @@ int cancel_async(struct proc *src_ptr, struct proc *dst_ptr)
   asynmsg_t tabent;
   vir_bytes table_v;
 
-  assert(proc_locked(src_ptr));
-  assert(proc_locked(dst_ptr));
+  assert_proc_locked(src_ptr);
+  assert_proc_locked(dst_ptr);
 
   privp = priv(src_ptr);
   if (!(privp->s_flags & SYS_PROC)) return(EPERM);
@@ -2134,7 +2180,8 @@ void enqueue(
    * process
    */
   else if (wake_remote_cpu) {
-	  smp_schedule(rp->p_cpu);
+	  /* Signal cpu that new work is available. */
+	  get_cpu_var(rp->p_cpu,fast_wake_up) = 1;
   } else {
 	  /* In this case, the proc has been enqueued on another cpu, and this
 	   * cpu is not idle. Check if we need to tell it to preempt its
@@ -2145,6 +2192,7 @@ void enqueue(
 	  if((p->p_priority>rp->p_priority)&&(priv(p)->s_flags&PREEMPTIBLE)) {
 		  smp_schedule(rp->p_cpu);
 	  }
+	  get_cpulocal_var(n_remote_preempt)++;
   }
 #endif
 
@@ -2310,12 +2358,13 @@ static struct proc * pick_proc(void)
   register struct proc *rp;			/* process to run */
   struct proc **rdy_head;
   int q;				/* iterate over queues */
+  const int cpu = cpuid;
 
   /* Check each of the scheduling queues for ready processes. The number of
    * queues is defined in proc.h, and priorities are set in the task table.
    * If there are no processes ready to run, return NULL.
    */
-  rdy_head = get_cpulocal_var(run_q_head);
+  rdy_head = get_cpu_var(cpu,run_q_head);
 retry:
   for (q=0; q < NR_SCHED_QUEUES; q++) {	
 	if(!(rp = rdy_head[q])) {
@@ -2328,7 +2377,7 @@ retry:
 		goto retry;
 	}
 	if (priv(rp)->s_flags & BILLABLE)	 	
-		get_cpulocal_var(bill_ptr) = rp; /* bill for system time */
+		get_cpu_var(cpu,bill_ptr) = rp; /* bill for system time */
 	return rp;
   }
   return NULL;
@@ -2384,8 +2433,8 @@ static void notify_scheduler(struct proc *p)
 	message m_no_quantum;
 	int err;
 
-	assert(proc_locked(p));
-	assert(proc_locked(p->p_scheduler));
+	assert_proc_locked(p);
+	assert_proc_locked(p->p_scheduler);
 
 	assert(!proc_kernel_scheduler(p));
 
@@ -2418,7 +2467,7 @@ static void notify_scheduler(struct proc *p)
 
 void proc_no_time(struct proc * p)
 {
-	assert(proc_locked(p));
+	assert_proc_locked(p);
 	if (!proc_kernel_scheduler(p) && priv(p)->s_flags & PREEMPTIBLE) {
 		/* this dequeues the process */
 		unlock_proc(p);
@@ -2519,14 +2568,21 @@ void sink(void)
 
 void _rts_set(struct proc *p,int flag,int lockflag)
 {
+	const int cpu = cpuid;
+
+#ifdef PROC_LOCK_CHECKS
 	if(lockflag==1)
-		assert(proc_locked_borrow(p));
+		assert_proc_locked_borrow(p);
 	else if(lockflag==2)
-		assert(proc_locked(p));
+		assert_proc_locked(p);
+#endif
+
 	p->p_rts_flags |= (flag);
 	if(!proc_is_runnable(p)&&p->p_enqueued) {
-		if(cpuid!=p->p_cpu)
+		if(cpu!=p->p_cpu) {
+			get_cpu_var(cpu,n_remote_dequeue)++;
 			smp_dequeue_task(p);
+		}
 		else
 			dequeue(p);
 	}
@@ -2536,10 +2592,14 @@ void _rts_set(struct proc *p,int flag,int lockflag)
 void _rts_unset(struct proc *p,int flag,int lockflag)
 {
 	int rts;
+
+#ifdef PROC_LOCK_CHECKS
 	if(lockflag==1)
-		assert(proc_locked_borrow(p));
+		assert_proc_locked_borrow(p);
 	else if(lockflag==2)
-		assert(proc_locked(p));
+		assert_proc_locked(p);
+#endif
+
 	rts = p->p_rts_flags;
 	p->p_rts_flags &= ~(flag);
 	if(!rts_f_is_runnable(rts) && proc_is_runnable(p)) {
@@ -2549,12 +2609,14 @@ void _rts_unset(struct proc *p,int flag,int lockflag)
 
 void _rts_setflags(struct proc *p,int flag)
 {
-	assert(proc_locked(p));
+	const int cpu = cpuid;
+	assert_proc_locked(p);
 	p->p_rts_flags = (flag);
 	if(proc_is_runnable(p) && (flag)) {
-		if(cpuid!=p->p_cpu)
+		if(cpu!=p->p_cpu) {
+			get_cpu_var(cpu,n_remote_dequeue)++;
 			smp_dequeue_task(p);
-		else
+		} else
 			dequeue(p);
 	}
 }

@@ -297,7 +297,7 @@ ENTRY(ipc_entry_common)
 	pop	%esi
 	mov     %eax, AXREG(%esi)
 
-	jmp	_C_LABEL(switch_to_user)
+	jmp	_C_LABEL(switch_to_user_curr_locked)
 
 
 /*
@@ -334,7 +334,7 @@ ENTRY(kernel_call_entry_common)
 	/* restore the current process pointer and save the return value */
 	add	$8, %esp
 
-	jmp	_C_LABEL(switch_to_user)
+	jmp	_C_LABEL(switch_to_user_curr_locked)
 
 
 .balign 16
@@ -405,6 +405,7 @@ ENTRY(restore_user_context_sysenter)
 
         /* restore PSW */
         movl    PSWREG(%ebp), %edi      /* load desired PSW to EDI */
+        andl    $0xfffffdff, %edi	/* Clear IF to avoid receiving int. */
         push    %edi
         popf
 
@@ -421,6 +422,7 @@ ENTRY(restore_user_context_syscall)
 
         /* restore PSW (before we switch to user stack!) */
         movl    PSWREG(%ebp), %edi      /* load desired PSW to EDI */
+        andl    $0xfffffdff, %edi	/* Clear IF to avoid receiving int. */
         push    %edi
         popf
 
@@ -429,6 +431,7 @@ ENTRY(restore_user_context_syscall)
 	mov	AXREG(%ebp), %eax	/* trap return value */
 	mov	BXREG(%ebp), %ebx	/* secondary return value */
 
+	sti
 	sysret				/* jump to EIP in user */
 
 ENTRY(restore_user_context_int)

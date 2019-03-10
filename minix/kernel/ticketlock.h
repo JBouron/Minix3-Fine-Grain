@@ -1,6 +1,7 @@
 #ifndef TICKETLOCK_H
 #define TICKETLOCK_H
-#include "spinlock.h" /* For atomic operations */
+
+#include <machine/archtypes.h>
 
 typedef struct ticketlock {
 	volatile atomic_t	next_ticket;

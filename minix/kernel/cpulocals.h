@@ -66,8 +66,14 @@ extern struct __cpu_local_vars {
 	int n_retries_recv;
 	int n_retries_recv_all_null;
 
+	int n_kernel_calls;		/* How many kernel calls ? */
+	int n_kernel_calls_non_opti;	/* How many kernel calls non opti ? */
+
 	int preempt_curr;		/* Should we preempt proc_ptr at the next
 					   switch_to_user ? */
+
+	int n_remote_preempt;
+	int n_remote_dequeue;
 	
 	/* One node per process, +1 for the idle proc. */
 	mcs_node_t mcs_nodes[NR_TASKS+NR_PROCS+1];
@@ -97,6 +103,13 @@ extern struct __cpu_local_vars {
 	struct proc * run_q_tail[NR_SCHED_QUEUES]; /* ptrs to ready list tails */
 	int cpu_is_idle; /* let the others know that you are idle */
 
+	/* When no work is available in the runqueues, the cpu will loop on the
+	 * `fast_wake_up` variable (after reseting it to 0) and wait until it
+	 * is set to 1.
+	 * That way, waking a cpu remotely becomes extremely fast compared to
+	 * sending an IPI.
+	 */
+	int fast_wake_up;
 	int idle_interrupted; /* to interrupt busy-idle
 						     while profiling */
 

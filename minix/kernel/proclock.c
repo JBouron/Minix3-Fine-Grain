@@ -16,8 +16,10 @@ struct proclock_impl_t proclock_impl;
  */
 static void _set_owner(struct proc *p)
 {
+#ifdef PROC_LOCK_CHECKS
 	assert(p->p_owner==-1);
 	p->p_owner = cpuid;
+#endif
 }
 
 /*
@@ -26,8 +28,10 @@ static void _set_owner(struct proc *p)
  */
 static void _reset_owner(struct proc *p)
 {
+#ifdef PROC_LOCK_CHECKS
 	assert(p->p_owner==cpuid);
 	p->p_owner = -1;
+#endif
 }
 
 void lock_proc(struct proc *p)
@@ -90,7 +94,6 @@ void unlock_two_procs(struct proc *p1,struct proc *p2)
 
 static void _sort3(struct proc **dest,struct proc *p1,struct proc *p2,struct proc *p3)
 {
-	assert(p1!=p2&&p2!=p3&&p3!=p1);
 	struct proc *const min12 = p1<p2?p1:p2;
 	struct proc *const min23 = p2<p3?p2:p3;
 	struct proc *const min13 = p1<p3?p1:p3;
@@ -107,7 +110,6 @@ static void _sort3(struct proc **dest,struct proc *p1,struct proc *p2,struct pro
 		dest[1] = min12;
 		dest[2] = max12;
 	} else {
-		assert(min12==min13);
 		dest[0] = p1;
 		dest[1] = min23;
 		dest[2] = max23;
@@ -150,30 +152,26 @@ void unlock_three_procs(struct proc *p1,struct proc *p2,struct proc *p3)
 	}
 }
 
-int proc_locked(const struct proc *p)
+void assert_proc_locked(const struct proc *p)
 {
 	/* Assert if a proc is locked by the current cpu.
 	 * We don't need to lock pseudo processes. */
-	if(!p)
-		return 1;
-	else if(p->p_endpoint==KERNEL||p->p_endpoint==SYSTEM)
-		return 1;
-	else
-		return p->p_owner==cpuid;
+#ifdef PROC_LOCK_CHECKS
+	if(p&&p->p_endpoint!=KERNEL&&p->p_endpoint!=SYSTEM)
+		assert(p->p_owner==cpuid);
+#endif
 }
 
-int proc_locked_borrow(const struct proc *p)
+void assert_proc_locked_borrow(const struct proc *p)
 {
 	/* Assert if a proc is locked by a remote cpu.
 	 * We don't need to lock pseudo processes. */
-	if(!p) {
-		return 1;
-	} else if(p->p_endpoint==KERNEL||p->p_endpoint==SYSTEM) {
-		return 1;
-	} else {
+#ifdef PROC_LOCK_CHECKS
+	if(p&&p->p_endpoint!=KERNEL&&p->p_endpoint!=SYSTEM) {
 		const int owner = p->p_owner;
-		return owner!=-1&&owner!=cpuid;
+		assert(owner!=-1&&owner!=cpuid);
 	}
+#endif
 }
 
 /* ========================================================================= */
@@ -181,91 +179,38 @@ int proc_locked_borrow(const struct proc *p)
 /* ========================================================================= */
 void _sl_lock_proc(struct proc *p)
 {
-	assert(p);
-	int tries = 0;
-retry:
-	tries++;
-	while(p->p_spinlock.val) {}
-
-	/* Try to lock p1. */
-	if(!arch_spinlock_test(&(p->p_spinlock.val))) {
-		goto retry;
-	}
-	p->p_n_lock++;
-	p->p_n_tries += tries;
+	spinlock_lock(&(p->p_spinlock));
 }
 
 void _sl_unlock_proc(struct proc *p)
 {
-	assert(p);
-	/* For now we bypass the reentrant locks. */
 	spinlock_unlock(&(p->p_spinlock));
 }
 
 void _sl_lock_two_procs(struct proc *p1,struct proc *p2)
 {
-	assert(p1&&p2&&p1<p2);
-
-	/* Perform two-way test-test&set. */
-retry:
-	while(p1->p_spinlock.val&&p2->p_spinlock.val) {}
-
-	/* Try to lock p1. */
-	if(!arch_spinlock_test(&(p1->p_spinlock.val))) {
-		goto retry;
-	}
-
-	/* Try to lock p2. */
-	if(!arch_spinlock_test(&(p2->p_spinlock.val))) {
-		/* Cannot lock p2, don't hold p1 and return to the test loop. */
-		proclock_impl.unlock_proc(p1);
-		goto retry;
-	}
+	_sl_lock_proc(p1);
+	_sl_lock_proc(p2);
 }
 
 void _sl_unlock_two_procs(struct proc *p1,struct proc *p2)
 {
-	assert(p1&&p2&&p1<p2);
-	proclock_impl.unlock_proc(p1);
-	proclock_impl.unlock_proc(p2);
+	_sl_unlock_proc(p1);
+	_sl_unlock_proc(p2);
 }
 
 void _sl_lock_three_procs(struct proc *p1,struct proc *p2,struct proc *p3)
 {
-	assert(p1&&p2&&p3&&p1<p2&&p2<p3);
-
-	/* Perform two-way test-test&set. */
-retry:
-	while(p1->p_spinlock.val&&
-	      p2->p_spinlock.val&&
-	      p3->p_spinlock.val) {}
-
-	/* Try to lock p1. */
-	if(!arch_spinlock_test(&(p1->p_spinlock.val))) {
-		goto retry;
-	}
-
-	/* Try to lock p2. */
-	if(!arch_spinlock_test(&(p2->p_spinlock.val))) {
-		/* Cannot lock p2, don't hold p1 and return to the test loop. */
-		proclock_impl.unlock_proc(p1);
-		goto retry;
-	}
-
-	/* Try to lock p3. */
-	if(!arch_spinlock_test(&(p3->p_spinlock.val))) {
-		/* Cannot lock p2, don't hold p1 and return to the test loop. */
-		proclock_impl.unlock_two_procs(p1,p2);
-		goto retry;
-	}
+	_sl_lock_proc(p1);
+	_sl_lock_proc(p2);
+	_sl_lock_proc(p3);
 }
 
 void _sl_unlock_three_procs(struct proc *p1,struct proc *p2,struct proc *p3)
 {
-	assert(p1&&p2&&p3&&p1<p2&&p2<p3);
-	proclock_impl.unlock_proc(p1);
-	proclock_impl.unlock_proc(p2);
-	proclock_impl.unlock_proc(p3);
+	_sl_unlock_proc(p1);
+	_sl_unlock_proc(p2);
+	_sl_unlock_proc(p3);
 }
 
 /* ========================================================================= */
@@ -312,14 +257,8 @@ void _tl_unlock_three_procs(struct proc *p1,struct proc *p2,struct proc *p3)
 /* ========================================================================= */
 static mcs_node_t *_get_mcs_node(struct proc *p)
 {
-	int idx;
-	if(p==&get_cpulocal_var(idle_proc)) {
-		idx = 0;
-	} else {
-		const ptrdiff_t addr_off = p-(&proc[0]);
-		/* +1 for the idle proc. */
-		idx = addr_off+1;
-	}
+	/* +1 because idle<n> has proc number -1 */
+	const int idx = p->p_nr+6;
 	return &(get_cpulocal_var(mcs_nodes)[idx]);
 }
 

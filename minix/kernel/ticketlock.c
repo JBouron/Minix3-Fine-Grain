@@ -1,4 +1,5 @@
 #include "ticketlock.h"
+#include "spinlock.h" // Fetch and inc
 
 void ticketlock_init(ticketlock_t *lock)
 {

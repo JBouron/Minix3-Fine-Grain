@@ -4,6 +4,7 @@
 #include "interrupt.h"
 #include "clock.h"
 #include "spinlock.h"
+#include "watchdog.h" /* For profiling start requests. */
 
 unsigned ncpus;
 unsigned ht_per_core;
@@ -26,6 +27,7 @@ static struct sched_ipi_data  sched_ipi_data[CONFIG_MAX_CPUS];
 #define SCHED_IPI_SAVE_CTX	4
 #define SCHED_IPI_DEQUEUE	8
 #define SCHED_IPI_MIGRATE	16
+#define SCHED_IPI_PROFILE	32	/* Start profiling on remote cpu. */
 
 static volatile unsigned ap_cpus_booted;
 
@@ -121,7 +123,7 @@ retry:
 	 * cpu is completing the request (which doesn't need the BKL).
 	 * Because we don't release and re-acquire the BKL we don't violate
 	 * the lock ordering wrt to the proc lock(s) we may have. */
-	int nmi = 1;
+	const int nmi = 1;
 	arch_send_smp_schedule_ipi(cpu,nmi);
 
 	/* wait until the destination cpu finishes its job */
@@ -164,7 +166,7 @@ void smp_schedule_migrate_proc(struct proc * p, unsigned dest_cpu)
 	 * stop the processes and force the complete context of the process to
 	 * be saved (i.e. including FPU state and such)
 	 */
-	assert(proc_locked(p));
+	assert_proc_locked(p);
 	/* The proc should not be in a middle of a migration already. */
 	assert(!(p->p_rts_flags&RTS_PROC_MIGR));
 	assert(p->p_cpu!=cpuid);
@@ -182,9 +184,18 @@ void smp_schedule_migrate_proc(struct proc * p, unsigned dest_cpu)
 void smp_dequeue_task(struct proc *p)
 {
 	assert(p->p_enqueued);
-	assert(proc_locked(p));
+	assert_proc_locked(p);
 	smp_schedule_sync(p,SCHED_IPI_DEQUEUE);
 	assert(!p->p_enqueued);
+}
+
+void smp_start_profile(const int target_cpu)
+{
+	struct proc dummy;
+	/* We're using kind of a hack here, as the smp_schedule_sync expects
+	 * a proc. */
+	dummy.p_cpu = target_cpu;
+	smp_schedule_sync(&dummy,SCHED_IPI_PROFILE);
 }
 
 void smp_sched_handler(void)
@@ -203,7 +214,7 @@ void smp_sched_handler(void)
 
 		/* The cpu triggering this NMI must always have the lock on the
 		 * proc. */
-		assert(proc_locked_borrow(p));
+		assert_proc_locked_borrow(p);
 
 		if (flgs & SCHED_IPI_STOP_PROC) {
 			RTS_SET_BORROW(p, RTS_PROC_STOP);
@@ -246,6 +257,15 @@ void smp_sched_handler(void)
 				p->p_next_cpu = -1;
 				RTS_UNSET_BORROW(p,RTS_PROC_MIGR);
 			}
+		}
+		if (flgs&SCHED_IPI_PROFILE) {
+			/* We need to start the profiler on this cpu. */
+			/* If we receive this request it means another cpu
+			 * started the profiling and thus set the `reset_val`
+			 * field to the frequency of the profiling. Thus we
+			 * can use it to start profiling on our side. */
+			const int freq = watchdog->resetval;
+			nmi_watchdog_start_profiling(freq);
 		}
 
 		/* Reset the flag value to indicate to the source cpu that we

@@ -214,8 +214,6 @@ void context_stop(struct proc * p)
 
 	cpu = cpuid;
 
-	lock_proc(p);
-
 	/*
 	 * This function is called only if we switch from kernel to user or idle
 	 * or back. Therefore this is a perfect location to place the big kernel
@@ -232,24 +230,9 @@ void context_stop(struct proc * p)
 		kernel_ticks[cpu] = kernel_ticks[cpu] + tmp;
 		p->p_cycles = p->p_cycles + tmp;
 	} else {
-		u64_t bkl_tsc;
-		atomic_t succ;
-		
-		/* We are entering the kernel thus make sure to grab the BKL
-		 * at the end. */
-		read_tsc_64(&bkl_tsc);
-		/* this only gives a good estimate */
-		succ = big_kernel_lock.val;
-
 		/* We are leaving user space now. */
 		ktzprofile_event(KTRACE_USER_STOP);
-		
 		read_tsc_64(&tsc);
-
-		bkl_ticks[cpu] = bkl_ticks[cpu] + tsc - bkl_tsc;
-		bkl_tries[cpu]++;
-		bkl_succ[cpu] += !(!(succ == 0));
-
 		p->p_cycles = p->p_cycles + tsc - *__tsc_ctr_switch;
 	}
 #else
@@ -260,14 +243,14 @@ void context_stop(struct proc * p)
 
 	tsc_delta = tsc - *__tsc_ctr_switch;
 
-	if (get_cpulocal_var(bill_ipc)) {
-		get_cpulocal_var(bill_ipc)->p_kipc_cycles += tsc_delta;
-		get_cpulocal_var(bill_ipc) = NULL;
+	if (get_cpu_var(cpu,bill_ipc)) {
+		get_cpu_var(cpu,bill_ipc)->p_kipc_cycles += tsc_delta;
+		get_cpu_var(cpu,bill_ipc) = NULL;
 	}
 
-	if (get_cpulocal_var(bill_kcall)) {
-		get_cpulocal_var(bill_kcall)->p_kcall_cycles += tsc_delta;
-		get_cpulocal_var(bill_kcall) = NULL;
+	if (get_cpu_var(cpu,bill_kcall)) {
+		get_cpu_var(cpu,bill_kcall)->p_kcall_cycles += tsc_delta;
+		get_cpu_var(cpu,bill_kcall) = NULL;
 	}
 
 	/*
@@ -282,25 +265,25 @@ void context_stop(struct proc * p)
 	 */
 	tpt = tsc_per_tick[cpu];
 
-	p->p_tick_cycles += tsc_delta;
-	while (tpt > 0 && p->p_tick_cycles >= tpt) {
-		p->p_tick_cycles -= tpt;
-
-		/*
-		 * The process has spent roughly a whole clock tick worth of
-		 * CPU cycles.  Update its per-process CPU utilization counter.
-		 * Some of the cycles may actually have been spent in a
-		 * previous second, but that is not a problem.
-		 */
-		cpuavg_increment(&p->p_cpuavg, kclockinfo.uptime, system_hz);
-	}
-
 	/*
 	 * deduct the just consumed cpu cycles from the cpu time left for this
 	 * process during its current quantum. Skip IDLE and other pseudo kernel
 	 * tasks, except for global accounting purposes.
 	 */
 	if (p->p_endpoint >= 0) {
+		p->p_tick_cycles += tsc_delta;
+		while (tpt > 0 && p->p_tick_cycles >= tpt) {
+			p->p_tick_cycles -= tpt;
+
+			/*
+			 * The process has spent roughly a whole clock tick worth of
+			 * CPU cycles.  Update its per-process CPU utilization counter.
+			 * Some of the cycles may actually have been spent in a
+			 * previous second, but that is not a problem.
+			 */
+			cpuavg_increment(&p->p_cpuavg, kclockinfo.uptime, system_hz);
+		}
+
 		/* On MINIX3, the "system" counter covers system processes. */
 		if (p->p_priv != priv_addr(USER_PRIV_ID))
 			counter = CP_SYS;
@@ -329,8 +312,6 @@ void context_stop(struct proc * p)
 	tsc_per_state[cpu][counter] += tsc_delta;
 
 	*__tsc_ctr_switch = tsc;
-
-	unlock_proc(p);
 }
 
 void context_stop_idle(void)

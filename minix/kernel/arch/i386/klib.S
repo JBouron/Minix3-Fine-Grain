@@ -786,11 +786,8 @@ cas_succ:
  */
 ENTRY(arch_spinlock_lock)
 	mov	4(%esp), %eax
-	push	%ebx
-	mov	$0, %ebx
 	mov	$1, %edx
 2:
-	add	$1, %ebx
 	mov	$1, %ecx
 	xchg	%ecx, (%eax)
 	test	%ecx, %ecx
@@ -808,9 +805,6 @@ ENTRY(arch_spinlock_lock)
 	jz	2b
 	jmp	3b
 0:
-	mfence
-	mov	%ebx, %eax
-	pop %ebx
 	ret
 
 /* int arch_spinlock_test(u32_t *lock_data) */
@@ -824,7 +818,6 @@ ENTRY(arch_spinlock_test)
 	ret
 
 0:
-	mfence
 	mov	$1, %eax
 	ret
 
@@ -837,7 +830,6 @@ ENTRY(arch_spinlock_unlock)
 	mov	4(%esp), %eax
 	mov	$0, %ecx
 	xchg	%ecx, (%eax)
-	mfence
 	ret
 
 #endif /* CONFIG_SMP */

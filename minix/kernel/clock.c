@@ -373,5 +373,9 @@ void cause_alarm(int proc_nr_e)
  */
 
   mini_notify(proc_addr(CLOCK), proc_nr_e);	/* notify process */
+  
+  /* mini_notify will not unlock the caller (CLOCK in this case) so we have to
+   * do it ourselves. */
+  unlock_proc(proc_addr(CLOCK));
 }
 
